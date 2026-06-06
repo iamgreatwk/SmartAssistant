@@ -208,6 +208,7 @@ struct ExpressionView: View {
             )
         }
         .stroke(Color.white, lineWidth: 2 * scale)
+        .frame(width: mw * 2 + 2 * scale, height: mw * 0.45 + 2 * scale)
     }
 
     private func sadMouth(mw: CGFloat, scale: CGFloat) -> some View {
@@ -219,6 +220,7 @@ struct ExpressionView: View {
             )
         }
         .stroke(Color.white, lineWidth: 2 * scale)
+        .frame(width: mw * 2 + 2 * scale, height: mw * 0.55 + 2 * scale)
     }
 
     private func smirkMouth(mw: CGFloat, scale: CGFloat) -> some View {
@@ -230,6 +232,7 @@ struct ExpressionView: View {
             )
         }
         .stroke(Color.white, lineWidth: 2 * scale)
+        .frame(width: mw * 1.7 + 2 * scale, height: mw * 0.55 + 2 * scale)
     }
 
     private func bigSmileMouth(mw: CGFloat, scale: CGFloat) -> some View {
