@@ -1,4 +1,5 @@
 import CoreMotion
+import UIKit
 import Combine
 
 /// 运动传感器服务 — 加速度计、陀螺仪、磁力计、设备姿态

@@ -67,9 +67,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI"
-          echo "Archive exit code: $?"
-          ls -la "$EXPORT_DIR/" 2>/dev/null || echo "No build dir yet"
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI" \
+            2>&1 | tee /tmp/build.log
+          EXIT=${PIPESTATUS[0]}
+          if [ $EXIT -ne 0 ]; then
+            echo ""
+            echo "===== COMPILATION ERRORS ====="
+            grep -E "error:|warning:" /tmp/build.log | head -60 || true
+            echo "===== END ERRORS ====="
+            exit $EXIT
+          fi
 
       - name: Export IPA
         run: |
