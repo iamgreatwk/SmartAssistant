@@ -137,7 +137,7 @@ struct ExpressionView: View {
             case .smirk:
                 smirkMouth(width: mouthW, size: size)
             case .kiss:
-                kissMouth(size: mouthW, size: size)
+                kissMouth(size: mouthW, sizeBase: size)
             }
         }
         .offset(y: size * 0.04)
