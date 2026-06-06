@@ -100,9 +100,6 @@ struct ChatView: View {
             // 顶部状态栏
             statusBar
             
-            // StackChan 表情角色
-            characterView
-            
             // 对话状态指示
             stateIndicator
             
@@ -123,7 +120,8 @@ struct ChatView: View {
             
             ExpressionView(
                 expression: chatVM.currentExpression,
-                speakingLevel: chatVM.speakingLevel
+                speakingLevel: chatVM.speakingLevel,
+                isFullscreen: true
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             

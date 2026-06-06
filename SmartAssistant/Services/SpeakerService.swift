@@ -35,6 +35,10 @@ class SpeakerService: NSObject, ObservableObject {
     
     // MARK: - 文字转语音
     
+    func updateConfig(_ newConfig: TTSConfig) {
+        self.config = newConfig
+    }
+    
     func speak(_ text: String, config: TTSConfig? = nil, completion: (() -> Void)? = nil) {
         let ttsConfig = config ?? self.config
         self.speakCompletion = completion
@@ -51,9 +55,11 @@ class SpeakerService: NSObject, ObservableObject {
         utterance.preUtteranceDelay = ttsConfig.preUtteranceDelay
         utterance.postUtteranceDelay = ttsConfig.postUtteranceDelay
         
-        // 设置中文语音
-        if let voice = AVSpeechSynthesisVoice(language: ttsConfig.voiceIdentifier) {
+        // 设置语音
+        if let voice = AVSpeechSynthesisVoice(identifier: ttsConfig.voiceIdentifier) {
             utterance.voice = voice
+        } else if let voice = AVSpeechSynthesisVoice(language: "zh-CN") {
+            utterance.voice = voice  // 降级到默认中文
         }
         
         DispatchQueue.main.async { self.isSpeaking = true }

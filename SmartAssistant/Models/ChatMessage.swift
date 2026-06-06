@@ -78,7 +78,7 @@ struct TTSConfig {
     var rate: Float = 0.5        // 语速 0.0-1.0
     var pitch: Float = 1.0       // 音高 0.5-2.0
     var volume: Float = 1.0      // 音量 0.0-1.0
-    var voiceIdentifier: String = "zh-CN"  // 语音标识
+    var voiceIdentifier: String = "com.apple.ttsbundle.TingTing-compact"  // 语音标识
     var preUtteranceDelay: TimeInterval = 0.0
     var postUtteranceDelay: TimeInterval = 0.0
 }

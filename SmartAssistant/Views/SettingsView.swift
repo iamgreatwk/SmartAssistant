@@ -89,6 +89,13 @@ struct SettingsView: View {
                             .multilineTextAlignment(.trailing)
                             .font(.caption)
                     }
+                    
+                    Picker("TTS 语音", selection: $chatVM.ttsConfig.voiceIdentifier) {
+                        Text("Ting-Ting (推荐)").tag("com.apple.ttsbundle.TingTing-compact")
+                        Text("Mei-Jia").tag("com.apple.ttsbundle.Mei-Jia-compact")
+                        Text("Sin-Ji").tag("com.apple.ttsbundle.Sin-Ji-compact")
+                        Text("系统默认").tag("zh-CN")
+                    }
                 } header: {
                     Label("语音交互", systemImage: "waveform")
                 }

@@ -17,6 +17,7 @@ class ChatViewModel: ObservableObject {
     @Published var speakingLevel: CGFloat = 0
     @Published var errorMessage: String?
     @Published var showSettings: Bool = false
+    @Published var ttsConfig = TTSConfig()
     
     // 对话状态
     @Published var conversationState: ConversationState = .idle
@@ -69,6 +70,13 @@ class ChatViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] level in
                 self?.speakingLevel = CGFloat(level)
+            }
+            .store(in: &cancellables)
+        
+        // TTS 配置同步
+        $ttsConfig
+            .sink { [weak self] config in
+                self?.speaker.updateConfig(config)
             }
             .store(in: &cancellables)
     }
