@@ -2,12 +2,17 @@ import SwiftUI
 
 // MARK: - StackChan 表情 (Canvas + Core Graphics)
 // 直接用 Canvas 绘制，100×100 虚拟坐标映射，和 HTML 预览完全一致
+// 动画用 Timer + @State 驱动，避免 TimelineView 的泛型推断问题
 
 struct ExpressionView: View {
     let expression: ExpressionType
     var size: CGFloat? = nil
     let speakingLevel: CGFloat
     let isFullscreen: Bool
+
+    @State private var displayDate = Date()
+
+    private let timer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
 
     init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0, isFullscreen: Bool = false) {
         self.expression = expression
@@ -19,51 +24,29 @@ struct ExpressionView: View {
     var body: some View {
         GeometryReader { geo in
             let s = size ?? min(geo.size.width, geo.size.height)
-            FaceCanvas(
-                s: s,
-                expression: expression,
-                speakingLevel: speakingLevel
-            )
-        }
-    }
-}
-
-// MARK: - Canvas 绘制（独立 View 避免类型推断问题）
-
-private struct FaceCanvas: View {
-    let s: CGFloat
-    let expression: ExpressionType
-    let speakingLevel: CGFloat
-
-    var body: some View {
-        TimelineView(.animation) { timeline in
             let scale = s / 100
-            let t = timeline.date.timeIntervalSinceReferenceDate
+            let t = displayDate.timeIntervalSinceReferenceDate
             let floatOffset = sin(t * 1.5) * 1.5
             let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
             let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
             let isBlinking = blinkPhase < 0.15
 
-            return AnyView(Canvas { context, size in
+            Canvas { context, size in
                 var ctx = context
 
-                // 画布居中，应用旋转和浮动
                 ctx.translateBy(x: size.width / 2, y: size.height / 2)
                 ctx.rotate(by: headTilt)
                 ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
 
-                // 黑色背景
                 ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
 
-                // 腮红
                 drawCheeks(ctx: ctx, scale: scale)
-
-                // 眼睛
                 drawEyes(ctx: ctx, scale: scale, isBlinking: isBlinking)
-
-                // 嘴巴
                 drawMouth(ctx: ctx, scale: scale)
-            })
+            }
+        }
+        .onReceive(timer) { _ in
+            displayDate = Date()
         }
     }
 
