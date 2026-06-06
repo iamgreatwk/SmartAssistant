@@ -78,69 +78,26 @@ jobs:
             exit $EXIT
           fi
 
-      - name: Export IPA
+      - name: Package IPA
         run: |
-          # Create temporary ExportOptions.plist
-          cat > exportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>debugging</string>
-              <key>compileBitcode</key>
-              <false/>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>provisioningProfiles</key>
-              <dict/>
-              <key>stripSwiftSymbols</key>
-              <true/>
-              <key>thinning</key>
-              <string>&lt;none&gt;</string>
-          </dict>
-          </plist>
-          EOF
+          APP_PATH="$EXPORT_DIR/$SCHEME.xcarchive/Products/Applications/$SCHEME.app"
+          echo "App path: $APP_PATH"
+          ls -la "$APP_PATH"
           
-          xcodebuild -exportArchive \
-            -archivePath "$EXPORT_DIR/$SCHEME.xcarchive" \
-            -exportPath "$EXPORT_DIR/$SCHEME" \
-            -exportOptionsPlist exportOptions.plist \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Verify IPA
-        run: |
-          IPA_PATH="$EXPORT_DIR/$SCHEME/$SCHEME.ipa"
-          if [ -f "$IPA_PATH" ]; then
-            echo "✅ IPA created successfully!"
-            ls -lh "$IPA_PATH"
-            echo ""
-            echo "📱 IPA Info:"
-            unzip -l "$IPA_PATH" | head -20
-          else
-            echo "❌ IPA not found! Checking export directory..."
-            find "$EXPORT_DIR" -type f
-            exit 1
-          fi
-
-      - name: Create Payload structure (for AltStore)
-        run: |
+          # Create Payload structure for unsigned IPA
           mkdir -p "$EXPORT_DIR/Payload"
-          cp -R "$EXPORT_DIR/$SCHEME.xcarchive/Products/Applications/$SCHEME.app" "$EXPORT_DIR/Payload/"
+          cp -R "$APP_PATH" "$EXPORT_DIR/Payload/"
+          
           cd "$EXPORT_DIR"
-          zip -r "$SCHEME-unsigned.ipa" Payload/
-          echo "Created unsigned IPA for AltStore"
-          ls -lh "$SCHEME-unsigned.ipa"
+          zip -r "$SCHEME.ipa" Payload/
+          echo "✅ IPA created!"
+          ls -lh "$SCHEME.ipa"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: SmartAssistant-${{ github.sha }}
-          path: |
-            ${{ env.EXPORT_DIR }}/${{ env.SCHEME }}/${{ env.SCHEME }}.ipa
-            ${{ env.EXPORT_DIR }}/${{ env.SCHEME }}-unsigned.ipa
+          path: ${{ env.EXPORT_DIR }}/${{ env.SCHEME }}.ipa
           retention-days: 90
           compression-level: 6
 
