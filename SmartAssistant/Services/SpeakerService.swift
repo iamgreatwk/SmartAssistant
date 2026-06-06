@@ -35,10 +35,6 @@ class SpeakerService: NSObject, ObservableObject {
     
     // MARK: - 文字转语音
     
-    func updateConfig(_ newConfig: TTSConfig) {
-        self.config = newConfig
-    }
-    
     func speak(_ text: String, config: TTSConfig? = nil, completion: (() -> Void)? = nil) {
         let ttsConfig = config ?? self.config
         self.speakCompletion = completion

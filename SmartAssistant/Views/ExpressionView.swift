@@ -28,7 +28,6 @@ struct ExpressionView: View {
             let fullScreenScale: CGFloat = isFullscreen ? 1.8 : 1.0
             let lw: CGFloat = isFullscreen ? 2.0 : 1.0  // 线条加粗
             
-            let areaH = s * 0.55 * fullScreenScale
             let areaW = s * 0.5 * fullScreenScale
             
             ZStack {
@@ -186,7 +185,7 @@ struct ExpressionView: View {
     
     private func speakingMouth(width: CGFloat, size: CGFloat, scale: CGFloat) -> some View {
         let lvl = max(0.15, speakingLevel)
-        Capsule()
+        return Capsule()
             .fill(Color.white)
             .frame(width: width * 0.7, height: max(size * 0.012 * scale, size * 0.02 * lvl * scale))
             .animation(.easeOut(duration: 0.06), value: speakingLevel)
