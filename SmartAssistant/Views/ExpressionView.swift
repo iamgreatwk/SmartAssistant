@@ -41,8 +41,7 @@ struct ExpressionView: View {
                 mouthLayer(scale: scale)
             }
             .frame(width: s, height: s)
-            .clipped()
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)  // 居中方形
             .rotationEffect(.degrees(headTilt))
             .offset(y: floatOffset)
         }
