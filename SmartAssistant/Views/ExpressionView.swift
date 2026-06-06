@@ -44,7 +44,7 @@ private struct FaceCanvas: View {
             let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
             let isBlinking = blinkPhase < 0.15
 
-            AnyView(Canvas { context, size in
+            return AnyView(Canvas { context, size in
                 var ctx = context
 
                 // 画布居中，应用旋转和浮动
