@@ -12,15 +12,11 @@ struct ContentView: View {
     
     enum Tab: String, CaseIterable {
         case chat = "对话"
-        case sensors = "传感器"
-        case camera = "相机"
         case settings = "设置"
         
         var icon: String {
             switch self {
             case .chat: return "message.fill"
-            case .sensors: return "antenna.radiowaves.left.and.right"
-            case .camera: return "camera.fill"
             case .settings: return "gearshape.fill"
             }
         }
@@ -34,18 +30,6 @@ struct ContentView: View {
                         Label(Tab.chat.rawValue, systemImage: Tab.chat.icon)
                     }
                     .tag(Tab.chat)
-                
-                SensorDashboardView(sensorVM: sensorVM)
-                    .tabItem {
-                        Label(Tab.sensors.rawValue, systemImage: Tab.sensors.icon)
-                    }
-                    .tag(Tab.sensors)
-                
-                CameraPreviewView()
-                    .tabItem {
-                        Label(Tab.camera.rawValue, systemImage: Tab.camera.icon)
-                    }
-                    .tag(Tab.camera)
                 
                 SettingsView(chatVM: chatVM, sensorVM: sensorVM)
                     .tabItem {
@@ -62,16 +46,16 @@ struct ContentView: View {
             Button("去设置") { permissionManager.openSettings() }
             Button("取消", role: .cancel) { }
         } message: {
-            Text("小智助手需要访问麦克风、摄像头和位置等权限才能正常工作。请在设置中开启。")
+            Text("小智助手需要访问麦克风和语音识别权限才能正常工作。请在设置中开启。")
         }
     }
     
     private func startServices() {
+        // 后台启动传感器（不显示UI但数据可用）
         sensorVM.startAllSensors()
         
         Task {
             await permissionManager.requestAllPermissions()
-            // 检查关键权限
             if permissionManager.microphoneStatus == .denied ||
                permissionManager.speechRecognitionStatus == .denied {
                 showPermissionAlert = true
@@ -86,8 +70,32 @@ struct ChatView: View {
     @ObservedObject var chatVM: ChatViewModel
     @State private var textInput: String = ""
     @FocusState private var isInputFocused: Bool
+    @State private var isExpressionFullscreen: Bool = false
     
     var body: some View {
+        ZStack {
+            // 正常模式
+            if !isExpressionFullscreen {
+                normalChatView
+            } else {
+                // 全屏表情模式
+                fullscreenExpressionView
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            // 横屏自动进入全屏表情，竖屏退出
+            let isLandscape = UIDevice.current.orientation.isLandscape
+            if isLandscape != isExpressionFullscreen {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    isExpressionFullscreen = isLandscape
+                }
+            }
+        }
+    }
+    
+    // MARK: - 正常对话模式
+    
+    private var normalChatView: some View {
         VStack(spacing: 0) {
             // 顶部状态栏
             statusBar
@@ -107,6 +115,42 @@ struct ChatView: View {
         .background(Color(.systemGroupedBackground))
     }
     
+    // MARK: - 全屏表情模式
+    
+    private var fullscreenExpressionView: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            ExpressionView(
+                expression: chatVM.currentExpression,
+                speakingLevel: chatVM.speakingLevel
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+            // 退出按钮
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                            isExpressionFullscreen = false
+                        }
+                    } label: {
+                        Image(systemName: "arrow.down.right.and.arrow.up.left")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Color.white.opacity(0.2))
+                            .clipShape(Circle())
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.top, 50)
+                }
+                Spacer()
+            }
+        }
+    }
+    
     // MARK: - 状态栏
     
     private var statusBar: some View {
@@ -117,7 +161,17 @@ struct ChatView: View {
             
             Spacer()
             
-            // 对话状态
+            // 全屏表情按钮
+            Button {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                    isExpressionFullscreen.toggle()
+                }
+            } label: {
+                Image(systemName: isExpressionFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
+            
             ConversationStatusBadge(state: chatVM.conversationState)
             
             Button {
@@ -137,10 +191,10 @@ struct ChatView: View {
     private var characterView: some View {
         ExpressionView(
             expression: chatVM.currentExpression,
-            size: 140,
             speakingLevel: chatVM.speakingLevel
         )
-        .padding(.vertical, 8)
+        .frame(height: 180)
+        .padding(.vertical, 4)
         .onTapGesture {
             if chatVM.conversationState == ChatViewModel.ConversationState.idle {
                 chatVM.startListening()
@@ -226,7 +280,7 @@ struct ChatView: View {
                 .font(.title2)
                 .fontWeight(.medium)
             
-            Text("我可以和你聊天，也能感知你的手机传感器\n按住输入框开始说话，或者打字发消息")
+            Text("按住输入框开始说话，或者打字发消息")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -353,7 +407,6 @@ struct ChatBubble: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             if message.role == .assistant {
-                // 助手头像
                 Text("🤖")
                     .font(.title3)
                     .frame(width: 36, height: 36)

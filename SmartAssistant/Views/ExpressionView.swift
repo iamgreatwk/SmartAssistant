@@ -1,501 +1,353 @@
 import SwiftUI
 
-/// StackChan 风格表情视图 — 核心动画角色
+// MARK: - StackChan 风格表情角色
+
 struct ExpressionView: View {
     let expression: ExpressionType
-    let size: CGFloat
-    let speakingLevel: CGFloat  // 0.0-1.0 说话音量级别
+    var size: CGFloat? = nil
+    let speakingLevel: CGFloat
     
-    @State private var blinkState: Bool = false
+    @State private var blinkPhase: Double = 0
     @State private var floatOffset: CGFloat = 0
-    @State private var rotation: Double = 0
+    @State private var breatheScale: CGFloat = 1.0
+    @State private var headTilt: Double = 0
+    @State private var eyeShine: Double = 0
     
-    private let timer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
-    private let floatTimer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    private let blinkTimer = Timer.publish(every: 3.5, on: .main, in: .common).autoconnect()
+    private let animTimer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
     
-    init(expression: ExpressionType, size: CGFloat = 200, speakingLevel: CGFloat = 0) {
+    init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0) {
         self.expression = expression
         self.size = size
         self.speakingLevel = speakingLevel
     }
     
     var body: some View {
-        ZStack {
-            // 身体/头部
-            headShape
-                .fill(
-                    LinearGradient(
-                        colors: [Color(hex: "FFE4B5"), Color(hex: "FFD700")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .shadow(color: Color.black.opacity(0.15), radius: size * 0.05, x: 0, y: size * 0.02)
+        GeometryReader { geo in
+            let baseSize = size ?? min(geo.size.width, geo.size.height)
+            let s = baseSize * 0.85
             
-            // 脸部特征
-            faceFeatures
-        }
-        .frame(width: size, height: size)
-        .offset(y: floatOffset)
-        .rotationEffect(.degrees(rotation))
-        .onReceive(timer) { _ in
-            blink()
-        }
-        .onReceive(floatTimer) { _ in
-            updateFloat()
-        }
-        .onAppear {
-            // 初始浮动
-            withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                floatOffset = size * 0.02
+            ZStack {
+                // 头部
+                headView(size: s)
+                
+                // 腮红
+                blushView(size: s)
+                
+                // 眼睛
+                eyesView(size: s)
+                
+                // 嘴巴
+                mouthView(size: s)
             }
+            .frame(width: baseSize, height: baseSize)
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .scaleEffect(breatheScale)
+            .offset(y: floatOffset)
+            .rotationEffect(.degrees(headTilt))
+        }
+        .onReceive(animTimer) { _ in
+            updateIdleAnimation()
+        }
+        .onReceive(blinkTimer) { _ in
+            triggerBlink()
         }
     }
     
-    // MARK: - 头部形状
+    // MARK: - 头部
     
-    private var headShape: some Shape {
-        RoundedRectangle(cornerRadius: size * 0.25)
-    }
-    
-    // MARK: - 脸部特征
-    
-    private var faceFeatures: some View {
-        let params = expression.params
+    private func headView(size: CGFloat) -> some View {
+        let gradient = RadialGradient(
+            colors: [
+                Color(red: 1.0, green: 0.95, blue: 0.78),
+                Color(red: 1.0, green: 0.85, blue: 0.55),
+                Color(red: 0.95, green: 0.75, blue: 0.4)
+            ],
+            center: .init(x: 0.42, y: 0.38),
+            startRadius: size * 0.05,
+            endRadius: size * 0.65
+        )
         
-        return ZStack {
-            // 腮红
-            if params.cheekColor > 0 {
-                cheekBlush(intensity: params.cheekColor)
-            }
-            
-            // 眉毛
-            eyebrows(angle: params.eyebrowAngle, expression: expression)
-            
-            // 眼睛
-            eyes(params: params)
-            
-            // 眼泪
-            if params.tearVisible {
-                tears()
-            }
-            
-            // 星星眼
-            if params.sparkleVisible {
-                sparkles()
-            }
-            
-            // 嘴巴
-            mouth(type: params.mouthType, scale: params.mouthScale, speakingLevel: speakingLevel)
-        }
+        return Circle()
+            .fill(gradient)
+            .frame(width: size, height: size)
+            .shadow(color: Color.black.opacity(0.12), radius: size * 0.04, x: 0, y: size * 0.03)
+            .overlay(
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.3), Color.clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: size * 0.03
+                    )
+                    .blur(radius: size * 0.02)
+            )
     }
     
     // MARK: - 腮红
     
-    private func cheekBlush(intensity: CGFloat) -> some View {
-        HStack(spacing: size * 0.45) {
-            Circle()
-                .fill(Color.pink.opacity(intensity * 0.3))
-                .frame(width: size * 0.15, height: size * 0.08)
-                .blur(radius: size * 0.02)
-            Circle()
-                .fill(Color.pink.opacity(intensity * 0.3))
-                .frame(width: size * 0.15, height: size * 0.08)
-                .blur(radius: size * 0.02)
-        }
-        .offset(y: size * 0.08)
-    }
-    
-    // MARK: - 眉毛
-    
-    private func eyebrows(angle: CGFloat, expression: ExpressionType) -> some View {
-        let isWink = expression == .wink
+    private func blushView(size: CGFloat) -> some View {
+        let params = expression.params
+        let intensity = params.cheekColor
         
-        return HStack(spacing: size * 0.32) {
-            // 左眉毛
-            eyebrowPath(isWink: isWink ? false : false)
-                .stroke(Color.brown, lineWidth: size * 0.015)
-                .frame(width: size * 0.15, height: size * 0.04)
-                .rotationEffect(.degrees(angle))
-                .offset(y: -size * 0.12)
+        return HStack(spacing: size * 0.42) {
+            Circle()
+                .fill(Color.pink.opacity(intensity * 0.25))
+                .frame(width: size * 0.14, height: size * 0.07)
+                .blur(radius: size * 0.025)
+                .offset(y: size * 0.06)
             
-            // 右眉毛（wink 时右边不同）
-            eyebrowPath(isWink: isWink)
-                .stroke(Color.brown, lineWidth: size * 0.015)
-                .frame(width: size * 0.15, height: size * 0.04)
-                .rotationEffect(.degrees(isWink ? -angle : angle))
-                .offset(y: -size * 0.12)
-        }
-    }
-    
-    private func eyebrowPath(isWink: Bool) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: 0, y: 10))
-            path.addQuadCurve(to: CGPoint(x: 30, y: isWink ? 5 : 10), control: CGPoint(x: 15, y: 0))
+            Circle()
+                .fill(Color.pink.opacity(intensity * 0.25))
+                .frame(width: size * 0.14, height: size * 0.07)
+                .blur(radius: size * 0.025)
+                .offset(y: size * 0.06)
         }
     }
     
     // MARK: - 眼睛
     
-    private func eyes(params: ExpressionType.ExpressionParams) -> some View {
-        let isWink = expression == .wink
-        let isSleepy = expression == .sleepy
+    private func eyesView(size: CGFloat) -> some View {
+        let params = expression.params
+        let eyeW = size * 0.185 * params.eyeScale
+        let eyeH = size * 0.21 * params.eyeScale
+        let pupilR = eyeW * 0.38 * params.pupilScale
         
         return ZStack {
-            if isSleepy {
-                // 困了：两条横线
-                sleepyEyes()
-            } else {
-                HStack(spacing: size * 0.28) {
-                    // 左眼
-                    eyeView(
-                        scale: params.eyeScale,
-                        pupilScale: params.pupilScale,
-                        pupilOffsetX: params.pupilOffsetX,
-                        offsetY: params.eyeOffsetY,
-                        isWink: false,
-                        isBlinking: blinkState
-                    )
-                    
-                    // 右眼
-                    eyeView(
-                        scale: params.eyeScale,
-                        pupilScale: params.pupilScale,
-                        pupilOffsetX: params.pupilOffsetX,
-                        offsetY: params.eyeOffsetY,
-                        isWink: isWink,
-                        isBlinking: blinkState
-                    )
-                }
-                .offset(y: size * -0.02)
+            HStack(spacing: size * 0.26) {
+                // 左眼
+                singleEye(
+                    width: eyeW, height: eyeH,
+                    pupilRadius: pupilR,
+                    pupilOffsetX: params.pupilOffsetX,
+                    offsetY: params.eyeOffsetY,
+                    isWink: expression == .wink
+                )
+                
+                // 右眼
+                singleEye(
+                    width: eyeW, height: eyeH,
+                    pupilRadius: pupilR,
+                    pupilOffsetX: params.pupilOffsetX,
+                    offsetY: params.eyeOffsetY,
+                    isWink: false
+                )
             }
+            .offset(y: size * -0.03)
+            
+            // 眼睛高光
+            eyeHighlights(size: size, eyeSpacing: eyeW, eyeOffsetY: params.eyeOffsetY)
         }
     }
     
-    private func eyeView(scale: CGFloat, pupilScale: CGFloat, pupilOffsetX: CGFloat, 
-                         offsetY: CGFloat, isWink: Bool, isBlinking: Bool) -> some View {
-        let eyeSize = size * 0.12 * scale
-        let pupilSize = eyeSize * 0.4 * pupilScale
+    private func singleEye(width: CGFloat, height: CGFloat, pupilRadius: CGFloat,
+                           pupilOffsetX: CGFloat, offsetY: CGFloat, isWink: Bool) -> some View {
+        let blinkHeight = blinkPhase > 0.1 ? max(height * 0.05, height * (1 - blinkPhase)) : height
+        let actualHeight = isWink ? height * 0.08 : blinkHeight
         
         return ZStack {
             // 眼白
-            Circle()
+            Ellipse()
                 .fill(Color.white)
-                .frame(width: eyeSize, height: isWink ? eyeSize * 0.15 : (isBlinking ? eyeSize * 0.1 : eyeSize))
+                .frame(width: width, height: actualHeight)
                 .overlay(
-                    Circle()
-                        .stroke(Color(hex: "8B7355"), lineWidth: size * 0.008)
+                    Ellipse()
+                        .stroke(Color(red: 0.4, green: 0.3, blue: 0.2), lineWidth: width * 0.1)
                 )
             
-            // 瞳孔（非眨眼且非wink时显示）
-            if !isBlinking && !isWink {
+            // 瞳孔 (非眨眼显示)
+            if blinkPhase < 0.15 && !isWink {
                 Circle()
-                    .fill(Color(hex: "2F1B0E"))
-                    .frame(width: pupilSize, height: pupilSize)
+                    .fill(
+                        RadialGradient(
+                            colors: [Color(red: 0.2, green: 0.08, blue: 0.03),
+                                     Color(red: 0.1, green: 0.05, blue: 0.02)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: pupilRadius
+                        )
+                    )
+                    .frame(width: pupilRadius * 2, height: pupilRadius * 2)
                     .offset(x: pupilOffsetX)
                 
-                // 高光
+                // 瞳孔高光
                 Circle()
                     .fill(Color.white)
-                    .frame(width: pupilSize * 0.35, height: pupilSize * 0.35)
-                    .offset(x: pupilSize * 0.2, y: -pupilSize * 0.2)
+                    .frame(width: pupilRadius * 0.45, height: pupilRadius * 0.45)
+                    .offset(x: pupilRadius * 0.3 + pupilOffsetX, y: -pupilRadius * 0.3)
             }
         }
         .offset(y: offsetY)
-        .animation(.easeInOut(duration: 0.15), value: isBlinking)
+        .animation(.easeInOut(duration: 0.1), value: blinkPhase)
     }
     
-    private func sleepyEyes() -> some View {
-        HStack(spacing: size * 0.32) {
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: 5))
-                path.addLine(to: CGPoint(x: size * 0.1, y: 5))
-            }
-            .stroke(Color(hex: "2F1B0E"), lineWidth: size * 0.015)
+    // MARK: - 眼睛高光
+    
+    private func eyeHighlights(size: CGFloat, eyeSpacing: CGFloat, eyeOffsetY: CGFloat) -> some View {
+        let highlightSize = eyeSpacing * 0.18
+        let spacing = size * 0.26
+        
+        return HStack(spacing: spacing) {
+            Circle()
+                .fill(Color.white.opacity(0.6 + eyeShine * 0.3))
+                .frame(width: highlightSize, height: highlightSize)
+                .offset(x: eyeSpacing * 0.25, y: -eyeSpacing * 0.5 + eyeOffsetY)
             
-            Path { path in
-                path.move(to: CGPoint(x: 0, y: 5))
-                path.addLine(to: CGPoint(x: size * 0.1, y: 5))
-            }
-            .stroke(Color(hex: "2F1B0E"), lineWidth: size * 0.015)
+            Circle()
+                .fill(Color.white.opacity(0.6 + eyeShine * 0.3))
+                .frame(width: highlightSize, height: highlightSize)
+                .offset(x: eyeSpacing * 0.25, y: -eyeSpacing * 0.5 + eyeOffsetY)
         }
-        .offset(y: -size * 0.02)
-    }
-    
-    // MARK: - 眼泪
-    
-    private func tears() -> some View {
-        HStack(spacing: size * 0.35) {
-            // 左眼泪
-            tear()
-                .offset(x: -size * 0.02, y: size * 0.05)
-            
-            // 右眼泪
-            tear()
-                .offset(x: size * 0.02, y: size * 0.05)
-        }
-    }
-    
-    private func tear() -> some View {
-        Image(systemName: "drop.fill")
-            .font(.system(size: size * 0.05))
-            .foregroundColor(.blue.opacity(0.6))
-            .offset(y: blinkState ? size * 0.02 : 0)
-            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: blinkState)
-    }
-    
-    // MARK: - 星星眼
-    
-    private func sparkles() -> some View {
-        HStack(spacing: size * 0.35) {
-            sparkle()
-            sparkle()
-        }
-        .offset(y: -size * 0.05)
-    }
-    
-    private func sparkle() -> some View {
-        Image(systemName: "sparkle")
-            .font(.system(size: size * 0.06))
-            .foregroundColor(.yellow)
-            .scaleEffect(blinkState ? 1.3 : 0.8)
-            .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: blinkState)
     }
     
     // MARK: - 嘴巴
     
-    private func mouth(type: ExpressionType.MouthType, scale: CGFloat, speakingLevel: CGFloat) -> some View {
-        Group {
-            switch type {
+    private func mouthView(size: CGFloat) -> some View {
+        let params = expression.params
+        let mouthW = size * 0.13 * params.mouthScale
+        let mouthH = size * 0.08 * params.mouthScale
+        
+        return ZStack {
+            switch params.mouthType {
             case .normal:
-                normalMouth(scale: scale)
+                normalMouth(width: mouthW)
             case .smile:
-                smileMouth(scale: scale)
+                smileMouth(width: mouthW)
             case .bigSmile:
-                bigSmileMouth(scale: scale)
+                bigSmileMouth(width: mouthW, height: mouthH)
             case .open:
-                speakingMouth(scale: scale, level: speakingLevel)
+                speakingMouth(width: mouthW, height: mouthH)
             case .sad:
-                sadMouth(scale: scale)
+                sadMouth(width: mouthW)
             case .surprised:
-                surprisedMouth(scale: scale)
+                surprisedMouth(width: mouthW)
             case .smirk:
-                smirkMouth(scale: scale)
+                smirkMouth(width: mouthW)
             case .kiss:
-                kissMouth(scale: scale)
+                kissMouth(size: mouthW * 0.6)
             }
         }
-        .offset(y: size * 0.1)
+        .offset(y: size * 0.12)
     }
     
-    private func normalMouth(scale: CGFloat) -> some View {
+    private func normalMouth(width: CGFloat) -> some View {
         Path { path in
-            let width = size * 0.12 * scale
             path.move(to: CGPoint(x: -width, y: 0))
-            path.addLine(to: CGPoint(x: width, y: 0))
+            path.addQuadCurve(
+                to: CGPoint(x: width, y: 0),
+                control: CGPoint(x: 0, y: width * 0.25)
+            )
         }
-        .stroke(Color(hex: "8B7355"), lineWidth: size * 0.012)
+        .stroke(Color(red: 0.5, green: 0.3, blue: 0.2), lineWidth: width * 0.25)
     }
     
-    private func smileMouth(scale: CGFloat) -> some View {
+    private func smileMouth(width: CGFloat) -> some View {
         Path { path in
-            let width = size * 0.14 * scale
-            path.move(to: CGPoint(x: -width, y: 0))
-            path.addQuadCurve(to: CGPoint(x: width, y: 0), control: CGPoint(x: 0, y: size * 0.05 * scale))
+            path.move(to: CGPoint(x: -width, y: 2))
+            path.addQuadCurve(
+                to: CGPoint(x: width, y: 2),
+                control: CGPoint(x: 0, y: width * 0.6)
+            )
         }
-        .stroke(Color(hex: "8B7355"), lineWidth: size * 0.012)
+        .stroke(Color(red: 0.5, green: 0.3, blue: 0.2), lineWidth: width * 0.25)
     }
     
-    private func bigSmileMouth(scale: CGFloat) -> some View {
+    private func bigSmileMouth(width: CGFloat, height: CGFloat) -> some View {
         ZStack {
-            // 张嘴
+            // 张嘴内部
             Path { path in
-                let width = size * 0.14 * scale
-                let height = size * 0.06 * scale
                 path.move(to: CGPoint(x: -width, y: -2))
-                path.addQuadCurve(to: CGPoint(x: width, y: -2), control: CGPoint(x: 0, y: height))
-                path.addQuadCurve(to: CGPoint(x: -width, y: -2), control: CGPoint(x: 0, y: -height))
+                path.addQuadCurve(to: CGPoint(x: width, y: -2), control: CGPoint(x: 0, y: height * 0.7))
+                path.addQuadCurve(to: CGPoint(x: -width, y: -2), control: CGPoint(x: 0, y: -height * 0.5))
             }
-            .fill(Color(hex: "FF6B6B").opacity(0.6))
+            .fill(Color(red: 0.9, green: 0.35, blue: 0.3).opacity(0.7))
             
-            // 微笑线
+            // 上弧线
             Path { path in
-                let width = size * 0.12 * scale
-                path.move(to: CGPoint(x: -width, y: 0))
-                path.addQuadCurve(to: CGPoint(x: width, y: 0), control: CGPoint(x: 0, y: size * 0.04 * scale))
+                path.move(to: CGPoint(x: -width * 0.9, y: -1))
+                path.addQuadCurve(to: CGPoint(x: width * 0.9, y: -1), control: CGPoint(x: 0, y: height * 0.5))
             }
-            .stroke(Color(hex: "8B7355"), lineWidth: size * 0.012)
+            .stroke(Color(red: 0.5, green: 0.3, blue: 0.2), lineWidth: width * 0.2)
         }
     }
     
-    private func speakingMouth(scale: CGFloat, level: CGFloat) -> some View {
-        let mouthHeight = size * 0.03 + size * 0.05 * level
+    private func speakingMouth(width: CGFloat, height: CGFloat) -> some View {
+        let level = max(0.15, speakingLevel)
+        let h = height * 1.4 * level
         
         return Ellipse()
-            .fill(Color(hex: "FF6B6B").opacity(0.5))
-            .frame(width: size * 0.1 * scale, height: max(size * 0.02, mouthHeight))
-            .animation(.easeInOut(duration: 0.1), value: level)
+            .fill(Color(red: 0.85, green: 0.3, blue: 0.25).opacity(0.7))
+            .frame(width: width * 1.2, height: max(height * 0.25, h))
+            .animation(.spring(response: 0.08, dampingFraction: 0.4), value: speakingLevel)
     }
     
-    private func sadMouth(scale: CGFloat) -> some View {
+    private func sadMouth(width: CGFloat) -> some View {
         Path { path in
-            let width = size * 0.1 * scale
-            path.move(to: CGPoint(x: -width, y: size * 0.04 * scale))
-            path.addQuadCurve(to: CGPoint(x: width, y: size * 0.04 * scale), control: CGPoint(x: 0, y: 0))
+            path.move(to: CGPoint(x: -width, y: width * 0.4))
+            path.addQuadCurve(
+                to: CGPoint(x: width, y: width * 0.4),
+                control: CGPoint(x: 0, y: 0)
+            )
         }
-        .stroke(Color(hex: "8B7355"), lineWidth: size * 0.012)
+        .stroke(Color(red: 0.5, green: 0.3, blue: 0.2), lineWidth: width * 0.25)
     }
     
-    private func surprisedMouth(scale: CGFloat) -> some View {
+    private func surprisedMouth(width: CGFloat) -> some View {
         Circle()
-            .fill(Color(hex: "4A3728"))
-            .frame(width: size * 0.1 * scale, height: size * 0.08 * scale)
+            .fill(Color(red: 0.2, green: 0.1, blue: 0.05))
+            .frame(width: width * 0.9, height: width * 0.75)
     }
     
-    private func smirkMouth(scale: CGFloat) -> some View {
+    private func smirkMouth(width: CGFloat) -> some View {
         Path { path in
-            let width = size * 0.12 * scale
-            path.move(to: CGPoint(x: -width * 0.8, y: 0))
-            path.addQuadCurve(to: CGPoint(x: width, y: -size * 0.02), control: CGPoint(x: width * 0.2, y: size * 0.04 * scale))
+            path.move(to: CGPoint(x: -width * 0.7, y: 0))
+            path.addQuadCurve(
+                to: CGPoint(x: width * 0.9, y: -width * 0.2),
+                control: CGPoint(x: width * 0.3, y: width * 0.4)
+            )
         }
-        .stroke(Color(hex: "8B7355"), lineWidth: size * 0.012)
+        .stroke(Color(red: 0.5, green: 0.3, blue: 0.2), lineWidth: width * 0.25)
     }
     
-    private func kissMouth(scale: CGFloat) -> some View {
+    private func kissMouth(size: CGFloat) -> some View {
         Circle()
-            .fill(Color.pink.opacity(0.4))
-            .frame(width: size * 0.06 * scale, height: size * 0.06 * scale)
+            .fill(Color(red: 0.95, green: 0.5, blue: 0.5).opacity(0.5))
+            .frame(width: size, height: size)
             .overlay(
                 Circle()
-                    .stroke(Color.pink.opacity(0.6), lineWidth: size * 0.008)
+                    .stroke(Color(red: 0.95, green: 0.5, blue: 0.5).opacity(0.7), lineWidth: size * 0.15)
             )
     }
     
     // MARK: - 动画
     
-    private func blink() {
-        withAnimation(.easeInOut(duration: 0.1)) {
-            blinkState = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            withAnimation(.easeInOut(duration: 0.1)) {
-                blinkState = false
-            }
+    private func triggerBlink() {
+        withAnimation(.easeOut(duration: 0.06)) { blinkPhase = 1.0 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation(.easeIn(duration: 0.12)) { blinkPhase = 0 }
         }
     }
     
-    private func updateFloat() {
-        // 自然的微小浮动
+    private func updateIdleAnimation() {
         let time = Date().timeIntervalSinceReferenceDate
-        floatOffset = sin(time * 2.0) * size * 0.015
-        rotation = sin(time * 1.3) * 1.5
+        
+        // 呼吸
+        breatheScale = 1.0 + sin(time * 1.4) * 0.015
+        
+        // 微浮动
+        floatOffset = sin(time * 2.0) * 2.5
+        
+        // 头微倾
+        headTilt = sin(time * 1.1) * 1.2
+        
+        // 星光闪烁
+        eyeShine = (sin(time * 3.2) + 1) / 2
     }
 }
 
-// MARK: - 交互式表情视图
-
-struct InteractiveExpressionView: View {
-    @State private var currentExpression: ExpressionType = .normal
-    @State private var speakingLevel: CGFloat = 0
-    @State private var isPressed: Bool = false
-    @State private var showExpressionPicker: Bool = false
-    
-    let size: CGFloat
-    
-    init(size: CGFloat = 200) {
-        self.size = size
-    }
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            // 角色
-            ExpressionView(
-                expression: currentExpression,
-                size: size,
-                speakingLevel: speakingLevel
-            )
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .onTapGesture {
-                // 点击切换表情
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isPressed = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation { isPressed = false }
-                }
-                cycleExpression()
-            }
-            .onLongPressGesture {
-                showExpressionPicker.toggle()
-            }
-            
-            // 表情名称
-            Text(currentExpression.emoji + " " + currentExpression.displayName)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            // 模拟说话控制
-            if currentExpression == .speaking {
-                HStack {
-                    Button("低") { speakingLevel = 0.2 }
-                        .buttonStyle(.bordered)
-                    Button("中") { speakingLevel = 0.5 }
-                        .buttonStyle(.bordered)
-                    Button("高") { speakingLevel = 0.9 }
-                        .buttonStyle(.bordered)
-                }
-                .font(.caption)
-            }
-            
-            // 表情选择器
-            if showExpressionPicker {
-                expressionPicker
-            }
-        }
-    }
-    
-    private func cycleExpression() {
-        let all = ExpressionType.allCases
-        let currentIndex = all.firstIndex(of: currentExpression) ?? 0
-        let nextIndex = (currentIndex + 1) % all.count
-        withAnimation(.easeInOut(duration: 0.3)) {
-            currentExpression = all[nextIndex]
-        }
-    }
-    
-    private var expressionPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(ExpressionType.allCases, id: \.self) { expression in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            currentExpression = expression
-                        }
-                        showExpressionPicker = false
-                    } label: {
-                        VStack(spacing: 4) {
-                            Text(expression.emoji)
-                                .font(.title)
-                            Text(expression.displayName)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(currentExpression == expression ? Color.blue.opacity(0.15) : Color.gray.opacity(0.05))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal)
-        }
-        .frame(height: 80)
-    }
-}
-
-// MARK: - Color Extensions
+// MARK: - Color Extension
 
 extension Color {
     init(hex: String) {
@@ -521,25 +373,4 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
-}
-
-// MARK: - 预览
-
-#Preview("表情展示") {
-    ScrollView {
-        VStack(spacing: 30) {
-            ForEach(ExpressionType.allCases, id: \.self) { expression in
-                VStack {
-                    ExpressionView(expression: expression, size: 120, speakingLevel: 0)
-                    Text(expression.displayName)
-                        .font(.caption)
-                }
-            }
-        }
-        .padding()
-    }
-}
-
-#Preview("交互式") {
-    InteractiveExpressionView(size: 200)
 }

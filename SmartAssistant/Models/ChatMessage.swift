@@ -86,9 +86,9 @@ struct TTSConfig {
 // MARK: - 应用配置
 
 struct AppConfig: Codable {
-    var aiApiEndpoint: String = "https://api.openai.com/v1/chat/completions"
-    var aiApiKey: String = ""
-    var aiModel: String = "gpt-4o"
+    var aiApiEndpoint: String = "http://192.168.1.10:1235/v1/chat/completions"
+    var aiApiKey: String = "lm-studio"
+    var aiModel: String = "gemma-4-e4b-it-qat"
     var systemPrompt: String = """
     你是一个智能助手，名叫"小智"。你可以通过用户的 iPhone 传感器感知环境。
     你的回复应该简洁、友好、有帮助。用中文回复。
