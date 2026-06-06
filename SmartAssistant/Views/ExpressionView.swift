@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - StackChan 风格表情 (黑底白线极简)
 // 绘制逻辑完全匹配 HTML 预览：以 100×100 为基准，scale = size / 100
-// 所有元素用 absolute position 定位，不再依赖 offset
+// 使用 VStack+Spacer 布局，不依赖 position/offset，最可靠
 
 struct ExpressionView: View {
     let expression: ExpressionType
@@ -27,22 +27,29 @@ struct ExpressionView: View {
     var body: some View {
         GeometryReader { geo in
             let s = size ?? min(geo.size.width, geo.size.height)
-            let scale = s / 100   // HTML 100×100 → Swift 像素
+            let scale = s / 100
 
-            ZStack {
-                Color.black
+            VStack(spacing: 0) {
+                // 眼睛中心距顶 38%
+                Color.clear.frame(height: 38 * scale)
 
-                cheekLayer(scale: scale)
-                    .position(x: s / 2, y: 48 * scale)
+                // 眼睛 + 腮红叠加
+                ZStack {
+                    eyesLayer(scale: scale)
+                    cheekLayer(scale: scale)
+                        .offset(y: 10 * scale)   // 腮红在眼睛下方 10 (48-38)
+                }
 
-                eyesLayer(scale: scale)
-                    .position(x: s / 2, y: 38 * scale)
+                // 嘴巴中心距眼睛中心 22 (60-38)
+                Color.clear.frame(height: 22 * scale)
 
                 mouthLayer(scale: scale)
-                    .position(x: s / 2, y: 60 * scale)
+
+                Spacer()
             }
             .frame(width: s, height: s)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black)
             .rotationEffect(.degrees(headTilt))
             .offset(y: floatOffset)
         }
@@ -56,7 +63,7 @@ struct ExpressionView: View {
         let p = expression.params
         guard p.cheek > 0 else { return AnyView(EmptyView()) }
 
-        let bs = 5 * p.cheek * scale            // 腮红大小
+        let bs = 5 * p.cheek * scale
         let color = Color(red: 1, green: 0.35, blue: 0.45).opacity(p.cheek * 0.4)
 
         return AnyView(
@@ -74,9 +81,7 @@ struct ExpressionView: View {
     // MARK: - 眼睛
 
     private func eyesLayer(scale: CGFloat) -> some View {
-        let spacing = 36 * scale              // HTML: eyeSpacing=18, 双眼间距=36
-
-        return HStack(spacing: spacing) {
+        HStack(spacing: 36 * scale) {
             eyeView(isRight: false, scale: scale)
             eyeView(isRight: true, scale: scale)
         }
@@ -86,8 +91,6 @@ struct ExpressionView: View {
         let p = expression.params
         let ew = 4.5 * p.eyeW * scale
         let eh = 4.5 * p.eyeH * scale
-
-        // wink: 左眼正常，右眼变横线
         let isWink = (expression == .wink && isRight)
 
         // 困了：横线
@@ -111,7 +114,7 @@ struct ExpressionView: View {
             )
         }
 
-        // 大笑：弧形（弯眼）
+        // 大笑：弧形眯眼
         if p.eyeType == .arches {
             return AnyView(
                 Path { path in
@@ -135,7 +138,6 @@ struct ExpressionView: View {
                     .fill(Color.white)
                     .frame(width: ew * 2, height: displayH)
 
-                // 瞳孔
                 let pr = ew * 0.35 * p.pupil
                 if pr > 0.5 * scale && !isBlinking && !isWink {
                     let pupilX: CGFloat = {
@@ -156,7 +158,7 @@ struct ExpressionView: View {
 
     private func mouthLayer(scale: CGFloat) -> some View {
         let p = expression.params
-        let mw = 8 * p.mouthW * scale              // 嘴宽基础值
+        let mw = 8 * p.mouthW * scale
 
         return Group {
             switch p.mouthType {
@@ -232,7 +234,6 @@ struct ExpressionView: View {
 
     private func bigSmileMouth(mw: CGFloat, scale: CGFloat) -> some View {
         ZStack {
-            // 填色的 D 形张嘴
             Path { path in
                 path.move(to: CGPoint(x: -mw, y: 0))
                 path.addQuadCurve(
@@ -245,7 +246,6 @@ struct ExpressionView: View {
                 )
             }
             .fill(Color.white)
-            // 舌头
             Ellipse()
                 .fill(Color(red: 0.9, green: 0.35, blue: 0.3))
                 .frame(width: mw * 0.4, height: mw * 0.3)
