@@ -31,13 +31,13 @@ struct ExpressionView: View {
             ZStack {
                 Color.black
                 
-                // 表情元素垂直居中
-                VStack(spacing: s * 0.06 * scale) {
-                    // 眼睛
+                // 表情元素垂直居中 (固定行高防漂移)
+                VStack(spacing: s * 0.08 * scale) {
                     eyeRow(size: s, scale: scale, lineWidth: lw)
+                        .frame(height: s * 0.06 * scale)
                     
-                    // 嘴巴
                     mouthRow(size: s, scale: scale, lineWidth: lw)
+                        .frame(height: s * 0.05 * scale)
                 }
                 
                 // 腮红覆盖层

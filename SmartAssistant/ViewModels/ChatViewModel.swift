@@ -105,13 +105,13 @@ class ChatViewModel: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
         
+        // 先完全停止语音识别，释放音频资源
+        speechRecognition.stopRecognition()
+        isListening = false
+        
         // 添加用户消息
         let userMessage = ChatMessage(role: .user, content: trimmed, expression: .normal)
         messages.append(userMessage)
-        
-        // 进入思考状态
-        isListening = false
-        isProcessing = true
         conversationState = .thinking
         currentExpression = .thinking
         

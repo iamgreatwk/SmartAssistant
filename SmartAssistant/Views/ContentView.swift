@@ -73,6 +73,10 @@ struct ContentView: View {
             Task {
                 await permissionManager.requestAllPermissions()
             }
+            // 打开app自动开始对话
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                chatVM.startListening()
+            }
         }
     }
     
