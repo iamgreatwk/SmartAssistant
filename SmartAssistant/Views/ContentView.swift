@@ -71,6 +71,7 @@ struct ChatView: View {
     @State private var textInput: String = ""
     @FocusState private var isInputFocused: Bool
     @State private var isExpressionFullscreen: Bool = false
+    @State private var deviceRotation: Double = 0
     
     var body: some View {
         ZStack {
@@ -83,12 +84,20 @@ struct ChatView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            // 横屏自动进入全屏表情，竖屏退出
-            let isLandscape = UIDevice.current.orientation.isLandscape
+            let orient = UIDevice.current.orientation
+            // 横屏自动进入全屏
+            let isLandscape = orient.isLandscape
             if isLandscape != isExpressionFullscreen {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     isExpressionFullscreen = isLandscape
                 }
+            }
+            // 更新旋转角度
+            switch orient {
+            case .landscapeLeft:  deviceRotation = -90
+            case .landscapeRight: deviceRotation = 90
+            case .portraitUpsideDown: deviceRotation = 180
+            default: deviceRotation = 0
             }
         }
     }
@@ -123,9 +132,21 @@ struct ChatView: View {
                 speakingLevel: chatVM.speakingLevel,
                 isFullscreen: true
             )
+            .rotationEffect(.degrees(deviceRotation))
+            .animation(.easeInOut(duration: 0.3), value: deviceRotation)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onTapGesture {
+                // 全屏点按直接开始/停止对话
+                if chatVM.isListening {
+                    chatVM.stopListening()
+                } else if chatVM.isSpeaking {
+                    chatVM.stopSpeaking()
+                } else {
+                    chatVM.startListening()
+                }
+            }
             
-            // 退出按钮
+            // 顶部按钮
             VStack {
                 HStack {
                     Spacer()
@@ -145,8 +166,21 @@ struct ChatView: View {
                     .padding(.top, 50)
                 }
                 Spacer()
+                
+                // 底部状态提示
+                Text(fullscreenHint)
+                    .font(.caption)
+                    .foregroundColor(Color.white.opacity(0.5))
+                    .padding(.bottom, 50)
             }
         }
+    }
+    
+    private var fullscreenHint: String {
+        if chatVM.isListening { return "正在听..." }
+        if chatVM.isProcessing { return "思考中..." }
+        if chatVM.isSpeaking { return "说话中..." }
+        return "点击屏幕开始对话"
     }
     
     // MARK: - 状态栏
