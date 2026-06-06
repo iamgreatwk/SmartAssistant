@@ -189,7 +189,9 @@ class ChatViewModel: ObservableObject {
         conversationState = .speaking
         currentExpression = emotion
         
-        speaker.speak(text) { [weak self] in
+        // 过滤掉 emoji，不让 TTS 读出来
+        let cleaned = text.filter { !$0.isEmoji }
+        speaker.speak(cleaned.trimmingCharacters(in: .whitespaces)) { [weak self] in
             DispatchQueue.main.async {
                 self?.conversationState = .idle
                 self?.currentExpression = .normal
@@ -314,5 +316,14 @@ class ChatViewModel: ObservableObject {
     
     func getConfig() -> AppConfig {
         return config
+    }
+}
+
+// MARK: - Character Extension
+
+extension Character {
+    var isEmoji: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return scalar.properties.isEmojiPresentation
     }
 }
