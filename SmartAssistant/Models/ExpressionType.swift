@@ -12,12 +12,12 @@ enum ExpressionType: String, CaseIterable, Codable {
     case listening  // 倾听中
     case speaking   // 说话中
     case sleepy     // 困了
-    case wink       // 眨眼
+    case wink       // 眨眼(挑逗)
     case love       // 喜欢
     case confused   // 困惑
     case cool       // 酷
     case shy        // 害羞
-    case excited    // 兴奋
+    case excited    // 兴奋(星星眼)
     
     var displayName: String {
         switch self {
@@ -61,105 +61,106 @@ enum ExpressionType: String, CaseIterable, Codable {
         }
     }
     
-    /// 表情参数配置
+    /// 表情参数
     struct ExpressionParams {
-        var eyeScale: CGFloat = 1.0        // 眼睛大小
-        var eyeOffsetY: CGFloat = 0         // 眼睛垂直偏移
-        var pupilScale: CGFloat = 1.0       // 瞳孔大小
-        var pupilOffsetX: CGFloat = 0       // 瞳孔水平偏移
-        var mouthType: MouthType = .normal  // 嘴型
-        var mouthScale: CGFloat = 1.0       // 嘴大小
-        var eyebrowAngle: CGFloat = 0       // 眉毛角度
-        var cheekColor: CGFloat = 0         // 腮红强度 0-1
-        var tearVisible: Bool = false       // 眼泪
-        var sparkleVisible: Bool = false    // 星星眼
+        var eyeScale: CGFloat = 1.0
+        var eyeOffsetY: CGFloat = 0
+        var pupilScale: CGFloat = 1.0
+        var pupilOffsetX: CGFloat = 0
+        var mouthType: MouthType = .normal
+        var mouthScale: CGFloat = 1.0
+        var cheekColor: CGFloat = 0     // 腮红 0-1
     }
     
     enum MouthType {
-        case normal    // 一字嘴
-        case smile     // 微笑
-        case bigSmile  // 大笑
-        case open      // 张嘴（说话）
-        case sad       // 难过嘴
-        case surprised // 惊讶嘴 (O型)
-        case smirk     // 歪嘴笑
-        case kiss      // 亲亲嘴
+        case normal     // 一字嘴 —
+        case smile      // 微笑弧线 )
+        case bigSmile   // 大笑 D
+        case open       // 张嘴 ○ (说话)
+        case sad        // 难过嘴 (
+        case surprised  // 小方块 ■
+        case smirk      // 歪嘴
+        case kiss       // 亲亲 ◎
     }
     
     var params: ExpressionParams {
         switch self {
         case .normal:
-            return ExpressionParams(
-                eyeScale: 1.0, mouthType: .normal, mouthScale: 1.0
-            )
+            return ExpressionParams(mouthType: .normal, mouthScale: 1.0)
+            
         case .happy:
             return ExpressionParams(
-                eyeScale: 0.85, pupilScale: 1.0, mouthType: .smile, mouthScale: 1.1,
-                cheekColor: 0.5
+                eyeScale: 0.9, mouthType: .smile, mouthScale: 1.0, cheekColor: 0.5
             )
+            
         case .veryHappy:
             return ExpressionParams(
-                eyeScale: 0.6, mouthType: .bigSmile, mouthScale: 1.3, eyebrowAngle: -10,
-                cheekColor: 0.8
+                eyeScale: 0.65, mouthType: .bigSmile, mouthScale: 1.3, cheekColor: 0.8
             )
+            
         case .sad:
             return ExpressionParams(
-                eyeScale: 1.0, eyeOffsetY: 5, pupilScale: 0.9,
-                mouthType: .sad, mouthScale: 0.8, eyebrowAngle: 15, tearVisible: true
+                eyeScale: 1.0, eyeOffsetY: 3, pupilScale: 0.8,
+                mouthType: .sad, mouthScale: 0.9
             )
+            
         case .angry:
             return ExpressionParams(
-                eyeScale: 0.9, pupilScale: 0.7, mouthType: .normal,
-                eyebrowAngle: -20, cheekColor: 0.6
+                eyeScale: 0.95, pupilScale: 0.6, mouthType: .normal,
+                mouthScale: 0.8, cheekColor: 0.7
             )
+            
         case .surprised:
             return ExpressionParams(
-                eyeScale: 1.3, pupilScale: 0.5, mouthType: .surprised,
-                mouthScale: 1.2, eyebrowAngle: -15
+                eyeScale: 1.4, pupilScale: 0.3, mouthType: .surprised, mouthScale: 1.1
             )
+            
         case .thinking:
             return ExpressionParams(
-                eyeScale: 0.9, pupilOffsetX: 8, mouthType: .smirk, mouthScale: 0.8
+                eyeScale: 0.85, pupilOffsetX: 10, mouthType: .smirk, mouthScale: 0.7
             )
+            
         case .listening:
             return ExpressionParams(
-                eyeScale: 1.1, pupilScale: 1.1, mouthType: .smile, mouthScale: 0.6
+                eyeScale: 1.15, pupilScale: 1.2, mouthType: .smile, mouthScale: 0.5
             )
+            
         case .speaking:
-            return ExpressionParams(
-                eyeScale: 1.0, mouthType: .open, mouthScale: 1.0
-            )
+            return ExpressionParams(mouthType: .open, mouthScale: 1.0)
+            
         case .sleepy:
-            return ExpressionParams(
-                eyeScale: 0.3, mouthType: .open, mouthScale: 0.5, eyebrowAngle: 5
-            )
+            return ExpressionParams(eyeScale: 0.25, mouthType: .open, mouthScale: 0.4)
+            
         case .wink:
             return ExpressionParams(
-                eyeScale: 1.0, pupilScale: 1.0, mouthType: .smile, mouthScale: 1.0
+                eyeScale: 1.0, mouthType: .smile, mouthScale: 1.0, cheekColor: 0.3
             )
+            
         case .love:
             return ExpressionParams(
-                eyeScale: 0.8, mouthType: .kiss, mouthScale: 0.9,
-                cheekColor: 1.0, sparkleVisible: true
+                eyeScale: 0.75, mouthType: .kiss, mouthScale: 0.9, cheekColor: 1.0
             )
+            
         case .confused:
             return ExpressionParams(
-                eyeScale: 1.0, pupilOffsetX: -5, mouthType: .sad, mouthScale: 0.7,
-                eyebrowAngle: 5
+                eyeScale: 1.0, pupilOffsetX: -6, mouthType: .sad, mouthScale: 0.6
             )
+            
         case .cool:
             return ExpressionParams(
-                eyeScale: 0.9, mouthType: .smirk, mouthScale: 1.0
+                eyeScale: 0.95, mouthType: .smirk, mouthScale: 1.0
             )
+            
         case .shy:
             return ExpressionParams(
-                eyeScale: 0.85, pupilOffsetX: 5, mouthType: .smile, mouthScale: 0.8,
-                cheekColor: 0.9
+                eyeScale: 0.8, pupilOffsetX: 6, mouthType: .smile,
+                mouthScale: 0.7, cheekColor: 0.9
             )
+            
         case .excited:
             return ExpressionParams(
-                eyeScale: 1.2, mouthType: .bigSmile, mouthScale: 1.4,
-                cheekColor: 0.7, sparkleVisible: true
+                eyeScale: 1.3, pupilScale: 0.4, mouthType: .bigSmile,
+                mouthScale: 1.5, cheekColor: 0.7
             )
         }
     }
