@@ -21,7 +21,7 @@ class ChatViewModel: ObservableObject {
     // 对话状态
     @Published var conversationState: ConversationState = .idle
     
-    enum ConversationState {
+    enum ConversationState: Equatable {
         case idle           // 空闲
         case listening      // 听你说话
         case thinking       // AI 思考中
@@ -68,7 +68,7 @@ class ChatViewModel: ObservableObject {
         microphoneService.$audioLevel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] level in
-                self?.speakingLevel = level
+                self?.speakingLevel = CGFloat(level)
             }
             .store(in: &cancellables)
     }

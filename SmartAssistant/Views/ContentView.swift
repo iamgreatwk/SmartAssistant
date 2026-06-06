@@ -142,7 +142,7 @@ struct ChatView: View {
         )
         .padding(.vertical, 8)
         .onTapGesture {
-            if chatVM.conversationState == .idle {
+            if chatVM.conversationState == ChatViewModel.ConversationState.idle {
                 chatVM.startListening()
             } else if chatVM.conversationState == .speaking {
                 chatVM.stopSpeaking()
@@ -208,7 +208,7 @@ struct ChatView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
-            .onChange(of: chatVM.messages.count) { _ in
+            .onChange(of: chatVM.messages.count) {
                 if let last = chatVM.messages.last {
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)

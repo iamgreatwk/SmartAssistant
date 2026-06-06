@@ -30,7 +30,7 @@ struct ExpressionView: View {
                         endPoint: .bottom
                     )
                 )
-                .shadow(color: .black.opacity(0.15), radius: size * 0.05, x: 0, y: size * 0.02)
+                .shadow(color: Color.black.opacity(0.15), radius: size * 0.05, x: 0, y: size * 0.02)
             
             // 脸部特征
             faceFeatures
@@ -54,7 +54,7 @@ struct ExpressionView: View {
     
     // MARK: - 头部形状
     
-    private var headShape: some View {
+    private var headShape: some Shape {
         RoundedRectangle(cornerRadius: size * 0.25)
     }
     

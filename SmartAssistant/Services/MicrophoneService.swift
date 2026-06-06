@@ -106,7 +106,7 @@ class MicrophoneService: NSObject, ObservableObject {
     // MARK: - 录音（保存文件）
     
     func startRecording(to url: URL) throws {
-        let settings: [String: Any] = [
+        _ = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: 44100,
             AVNumberOfChannelsKey: 1,

@@ -44,7 +44,7 @@ struct SensorDashboardView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        sensorVM.requestAllPermissions()
+                        Task { await sensorVM.requestAllPermissions() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
