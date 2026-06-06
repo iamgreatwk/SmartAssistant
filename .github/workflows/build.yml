@@ -25,7 +25,7 @@ env:
 jobs:
   build:
     name: Build iOS IPA
-    runs-on: macos-15
+    runs-on: macos-14
 
     steps:
       - name: Checkout code
@@ -55,10 +55,10 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI"
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI" 2>&1 | tail -50
 
       - name: Export IPA
         run: |
@@ -138,7 +138,7 @@ jobs:
   # 可选：代码检查
   lint:
     name: SwiftLint
-    runs-on: macos-15
+    runs-on: macos-14
     if: github.event_name == 'pull_request'
     
     steps:
@@ -157,7 +157,7 @@ jobs:
   # 可选：测试
   test:
     name: Run Tests
-    runs-on: macos-15
+    runs-on: macos-14
     needs: build
     if: github.event_name == 'pull_request'
     

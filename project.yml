@@ -7,7 +7,6 @@ options:
 
 settings:
   base:
-    SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1"
     INFOPLIST_FILE: SmartAssistant/Resources/Info.plist
     PRODUCT_BUNDLE_IDENTIFIER: com.yourname.smartassistant
