@@ -33,6 +33,14 @@ jobs:
 
       - name: Show Xcode version
         run: |
+          echo "Default Xcode:"
+          xcodebuild -version
+          echo ""
+          echo "Available Xcodes:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "listing..."
+          sudo xcode-select -s /Applications/Xcode_16.app 2>/dev/null || sudo xcode-select -s /Applications/Xcode_16.2.app 2>/dev/null || sudo xcode-select -s /Applications/Xcode_16.1.app 2>/dev/null || sudo xcode-select -s /Applications/Xcode_16.0.app 2>/dev/null || true
+          echo ""
+          echo "Selected Xcode:"
           xcodebuild -version
           xcrun --show-sdk-path
           swift --version
