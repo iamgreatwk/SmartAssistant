@@ -30,7 +30,7 @@ struct ExpressionView: View {
                 let isBlinking = blinkPhase < 0.15
 
                 Canvas { context, size in
-                    let ctx = context
+                    var ctx = context
 
                     // 把画布原点移到中间，应用旋转和浮动
                     ctx.translateBy(x: size.width / 2, y: size.height / 2)
