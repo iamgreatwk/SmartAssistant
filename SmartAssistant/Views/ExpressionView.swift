@@ -1,21 +1,13 @@
 import SwiftUI
 
-// MARK: - StackChan 风格表情 (黑底白线极简)
-// 绘制逻辑完全匹配 HTML 预览：以 100×100 为基准，scale = size / 100
-// 使用 VStack+Spacer 布局，不依赖 position/offset，最可靠
+// MARK: - StackChan 表情 (Canvas + Core Graphics)
+// 直接用 Canvas 绘制，100×100 虚拟坐标映射，和 HTML 预览完全一致
 
 struct ExpressionView: View {
     let expression: ExpressionType
     var size: CGFloat? = nil
     let speakingLevel: CGFloat
     let isFullscreen: Bool
-
-    @State private var isBlinking: Bool = false
-    @State private var floatOffset: CGFloat = 0
-    @State private var headTilt: Double = 0
-
-    private let blinkTimer = Timer.publish(every: 3.5, on: .main, in: .common).autoconnect()
-    private let animTimer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
 
     init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0, isFullscreen: Bool = false) {
         self.expression = expression
@@ -26,248 +18,191 @@ struct ExpressionView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let s = size ?? min(geo.size.width, geo.size.height)
-            let scale = s / 100
+            TimelineView(.animation) { timeline in
 
-            VStack(spacing: 0) {
-                // 眼睛中心距顶 38%
-                Color.clear.frame(height: 38 * scale)
+                let s = size ?? min(geo.size.width, geo.size.height)
+                let scale = s / 100
 
-                // 眼睛 + 腮红叠加
-                ZStack {
-                    eyesLayer(scale: scale)
-                    cheekLayer(scale: scale)
-                        .offset(y: 10 * scale)   // 腮红在眼睛下方 10 (48-38)
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let floatOffset = sin(t * 1.5) * 1.5
+                let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
+                let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
+                let isBlinking = blinkPhase < 0.15
+
+                Canvas { context, size in
+                    let ctx = context
+
+                    // 把画布原点移到中间，应用旋转和浮动
+                    ctx.translateBy(x: size.width / 2, y: size.height / 2)
+                    ctx.rotate(by: headTilt)
+                    ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
+
+                    // 黑色背景
+                    ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
+
+                    // 腮红
+                    drawCheeks(ctx: ctx, scale: scale, isBlinking: isBlinking)
+
+                    // 眼睛
+                    drawEyes(ctx: ctx, scale: scale, isBlinking: isBlinking)
+
+                    // 嘴巴
+                    drawMouth(ctx: ctx, scale: scale, isBlinking: isBlinking)
                 }
-
-                // 嘴巴中心距眼睛中心 22 (60-38)
-                Color.clear.frame(height: 22 * scale)
-
-                mouthLayer(scale: scale)
-
-                Spacer()
             }
-            .frame(width: s, height: s)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.black)
-            .rotationEffect(.degrees(headTilt))
-            .offset(y: floatOffset)
         }
-        .onReceive(animTimer) { _ in animate() }
-        .onReceive(blinkTimer) { _ in triggerBlink() }
     }
 
     // MARK: - 腮红
 
-    private func cheekLayer(scale: CGFloat) -> some View {
+    private func drawCheeks(ctx: GraphicsContext, scale: CGFloat, isBlinking: Bool) {
         let p = expression.params
-        guard p.cheek > 0 else { return AnyView(EmptyView()) }
+        guard p.cheek > 0 else { return }
 
         let bs = 5 * p.cheek * scale
-        let color = Color(red: 1, green: 0.35, blue: 0.45).opacity(p.cheek * 0.4)
+        let bx = 20 * scale
+        let by = 48 * scale
 
-        return AnyView(
-            HStack(spacing: 40 * scale) {
-                RoundedRectangle(cornerRadius: bs * 0.2)
-                    .fill(color)
-                    .frame(width: bs, height: bs * 0.7)
-                RoundedRectangle(cornerRadius: bs * 0.2)
-                    .fill(color)
-                    .frame(width: bs, height: bs * 0.7)
-            }
-        )
+        let color = GraphicsContext.Shading.color(Color(red: 1, green: 0.35, blue: 0.45).opacity(p.cheek * 0.4))
+
+        let leftRect = CGRect(x: 50 * scale - bx - bs / 2, y: by - bs * 0.35, width: bs, height: bs * 0.7)
+        let rightRect = CGRect(x: 50 * scale + bx - bs / 2, y: by - bs * 0.35, width: bs, height: bs * 0.7)
+
+        let leftPath = Path(roundedRect: leftRect, cornerRadius: bs * 0.2)
+        let rightPath = Path(roundedRect: rightRect, cornerRadius: bs * 0.2)
+
+        ctx.fill(leftPath, with: color)
+        ctx.fill(rightPath, with: color)
     }
 
     // MARK: - 眼睛
 
-    private func eyesLayer(scale: CGFloat) -> some View {
-        HStack(spacing: 36 * scale) {
-            eyeView(isRight: false, scale: scale)
-            eyeView(isRight: true, scale: scale)
-        }
+    private func drawEyes(ctx: GraphicsContext, scale: CGFloat, isBlinking: Bool) {
+        drawEye(ctx: ctx, scale: scale, isRight: false, isBlinking: isBlinking)
+        drawEye(ctx: ctx, scale: scale, isRight: true, isBlinking: isBlinking)
     }
 
-    private func eyeView(isRight: Bool, scale: CGFloat) -> some View {
+    private func drawEye(ctx: GraphicsContext, scale: CGFloat, isRight: Bool, isBlinking: Bool) {
         let p = expression.params
+        let cx = 50 * scale + (isRight ? 18 * scale : -18 * scale)
+        let cy = 38 * scale
         let ew = 4.5 * p.eyeW * scale
         let eh = 4.5 * p.eyeH * scale
+
         let isWink = (expression == .wink && isRight)
 
         // 困了：横线
         if p.eyeType == .lines {
-            return AnyView(
-                Capsule()
-                    .fill(Color.white)
-                    .frame(width: ew * 2.5, height: 1.5 * scale)
-            )
+            var capsule = Path()
+            capsule.addEllipse(in: CGRect(x: cx - ew * 1.25, y: cy - 0.75 * scale, width: ew * 2.5, height: 1.5 * scale))
+            ctx.fill(capsule, with: .color(.white))
+            return
         }
 
         // 生气：斜线
         if p.eyeType == .slant {
-            return AnyView(
-                Path { path in
-                    path.move(to: CGPoint(x: -ew, y: -eh * 0.4))
-                    path.addLine(to: CGPoint(x: ew, y: eh * 0.4))
-                }
-                .stroke(Color.white, lineWidth: 2 * scale)
-                .frame(width: ew * 2, height: eh * 2)
-            )
+            var line = Path()
+            line.move(to: CGPoint(x: cx - ew, y: cy - eh * 0.4))
+            line.addLine(to: CGPoint(x: cx + ew, y: cy + eh * 0.4))
+            ctx.stroke(line, with: .color(.white), lineWidth: 2 * scale)
+            return
         }
 
         // 大笑：弧形眯眼
         if p.eyeType == .arches {
-            return AnyView(
-                Path { path in
-                    path.move(to: CGPoint(x: -ew, y: eh))
-                    path.addQuadCurve(
-                        to: CGPoint(x: ew, y: eh),
-                        control: CGPoint(x: 0, y: -eh)
-                    )
-                }
-                .stroke(Color.white, lineWidth: 2 * scale)
-                .frame(width: ew * 2, height: eh * 2)
-            )
+            var arc = Path()
+            arc.move(to: CGPoint(x: cx - ew, y: cy + eh))
+            arc.addQuadCurve(to: CGPoint(x: cx + ew, y: cy + eh), control: CGPoint(x: cx, y: cy - eh))
+            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
+            return
         }
 
-        // 默认：圆眼 (dots / big)
+        // 默认：圆眼
         let displayH = isWink ? ew * 0.15 : (isBlinking ? ew * 0.15 : eh * 2)
 
-        return AnyView(
-            ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: ew * 2, height: displayH)
+        // 眼白
+        var eyeCircle = Path()
+        eyeCircle.addEllipse(in: CGRect(x: cx - ew, y: cy - displayH / 2, width: ew * 2, height: displayH))
+        ctx.fill(eyeCircle, with: .color(.white))
 
-                let pr = ew * 0.35 * p.pupil
-                if pr > 0.5 * scale && !isBlinking && !isWink {
-                    let pupilX: CGFloat = {
-                        if p.pupilL && !isRight { return -2 * scale }
-                        if p.pupilR && isRight { return 2 * scale }
-                        return 0
-                    }()
-                    Circle()
-                        .fill(Color.black)
-                        .frame(width: pr * 2, height: pr * 2)
-                        .offset(x: pupilX)
-                }
-            }
-        )
+        // 瞳孔
+        let pr = ew * 0.35 * p.pupil
+        if pr > 0.5 * scale && !isBlinking && !isWink {
+            let pupilX: CGFloat = {
+                if p.pupilL && !isRight { return cx - 2 * scale }
+                if p.pupilR && isRight { return cx + 2 * scale }
+                return cx
+            }()
+            var pupil = Path()
+            pupil.addEllipse(in: CGRect(x: pupilX - pr, y: cy - pr, width: pr * 2, height: pr * 2))
+            ctx.fill(pupil, with: .color(.black))
+        }
     }
 
     // MARK: - 嘴巴
 
-    private func mouthLayer(scale: CGFloat) -> some View {
+    private func drawMouth(ctx: GraphicsContext, scale: CGFloat, isBlinking: Bool) {
         let p = expression.params
         let mw = 8 * p.mouthW * scale
+        let cx: CGFloat = 50 * scale
+        let cy: CGFloat = 60 * scale
 
-        return Group {
-            switch p.mouthType {
-            case .line:
-                Capsule()
-                    .fill(Color.white)
-                    .frame(width: mw * 1.4, height: 1.5 * scale)
+        switch p.mouthType {
+        case .line:
+            var capsule = Path()
+            capsule.addEllipse(in: CGRect(x: cx - mw * 0.7, y: cy - 0.75 * scale, width: mw * 1.4, height: 1.5 * scale))
+            ctx.fill(capsule, with: .color(.white))
 
-            case .smile:
-                smileMouth(mw: mw, scale: scale)
+        case .smile:
+            var arc = Path()
+            arc.move(to: CGPoint(x: cx - mw, y: cy))
+            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.4))
+            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
 
-            case .bigSmile:
-                bigSmileMouth(mw: mw, scale: scale)
+        case .bigSmile:
+            // 填色 D 形张嘴
+            var shape = Path()
+            shape.move(to: CGPoint(x: cx - mw, y: cy))
+            shape.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.6))
+            shape.addQuadCurve(to: CGPoint(x: cx - mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.2))
+            shape.closeSubpath()
+            ctx.fill(shape, with: .color(.white))
 
-            case .open:
-                let lvl = max(0.15, speakingLevel)
-                Ellipse()
-                    .fill(Color.white)
-                    .frame(width: mw * 0.9, height: max(2 * scale, 6 * scale * lvl))
+            // 舌头
+            var tongue = Path()
+            tongue.addEllipse(in: CGRect(x: cx - mw * 0.2, y: cy + mw * 0.05, width: mw * 0.4, height: mw * 0.3))
+            ctx.fill(tongue, with: .color(Color(red: 0.9, green: 0.35, blue: 0.3)))
 
-            case .sad:
-                sadMouth(mw: mw, scale: scale)
+        case .open:
+            let lvl = max(0.15, speakingLevel)
+            var ellipse = Path()
+            let mouthH = max(2 * scale, 6 * scale * lvl)
+            ellipse.addEllipse(in: CGRect(x: cx - mw * 0.45, y: cy - mouthH / 2, width: mw * 0.9, height: mouthH))
+            ctx.fill(ellipse, with: .color(.white))
 
-            case .block:
-                let bs = mw * 0.7
-                RoundedRectangle(cornerRadius: 4 * scale)
-                    .fill(Color.white)
-                    .frame(width: bs, height: bs)
+        case .sad:
+            var arc = Path()
+            arc.move(to: CGPoint(x: cx - mw, y: cy + mw * 0.3))
+            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy + mw * 0.3), control: CGPoint(x: cx, y: cy - mw * 0.2))
+            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
 
-            case .smirk:
-                smirkMouth(mw: mw, scale: scale)
+        case .block:
+            let bs = mw * 0.7
+            var rect = Path()
+            rect.addRoundedRect(in: CGRect(x: cx - bs / 2, y: cy - bs / 2, width: bs, height: bs), cornerSize: CGSize(width: 4 * scale, height: 4 * scale))
+            ctx.fill(rect, with: .color(.white))
 
-            case .kiss:
-                Circle()
-                    .stroke(Color(red: 1, green: 0.45, blue: 0.55), lineWidth: 1.5 * scale)
-                    .frame(width: mw * 0.7, height: mw * 0.7)
-            }
+        case .smirk:
+            var arc = Path()
+            arc.move(to: CGPoint(x: cx - mw * 0.7, y: cy + mw * 0.2))
+            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy - mw * 0.05), control: CGPoint(x: cx + mw * 0.1, y: cy + mw * 0.5))
+            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
+
+        case .kiss:
+            var circle = Path()
+            let r = mw * 0.35
+            circle.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
+            ctx.stroke(circle, with: .color(Color(red: 1, green: 0.45, blue: 0.55)), lineWidth: 1.5 * scale)
         }
-    }
-
-    private func smileMouth(mw: CGFloat, scale: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -mw, y: 0))
-            path.addQuadCurve(
-                to: CGPoint(x: mw, y: 0),
-                control: CGPoint(x: 0, y: mw * 0.4)
-            )
-        }
-        .stroke(Color.white, lineWidth: 2 * scale)
-        .frame(width: mw * 2 + 2 * scale, height: mw * 0.45 + 2 * scale)
-    }
-
-    private func sadMouth(mw: CGFloat, scale: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -mw, y: mw * 0.3))
-            path.addQuadCurve(
-                to: CGPoint(x: mw, y: mw * 0.3),
-                control: CGPoint(x: 0, y: -mw * 0.2)
-            )
-        }
-        .stroke(Color.white, lineWidth: 2 * scale)
-        .frame(width: mw * 2 + 2 * scale, height: mw * 0.55 + 2 * scale)
-    }
-
-    private func smirkMouth(mw: CGFloat, scale: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: -mw * 0.7, y: mw * 0.2))
-            path.addQuadCurve(
-                to: CGPoint(x: mw, y: -mw * 0.05),
-                control: CGPoint(x: mw * 0.1, y: mw * 0.5)
-            )
-        }
-        .stroke(Color.white, lineWidth: 2 * scale)
-        .frame(width: mw * 1.7 + 2 * scale, height: mw * 0.55 + 2 * scale)
-    }
-
-    private func bigSmileMouth(mw: CGFloat, scale: CGFloat) -> some View {
-        ZStack {
-            Path { path in
-                path.move(to: CGPoint(x: -mw, y: 0))
-                path.addQuadCurve(
-                    to: CGPoint(x: mw, y: 0),
-                    control: CGPoint(x: 0, y: mw * 0.6)
-                )
-                path.addQuadCurve(
-                    to: CGPoint(x: -mw, y: 0),
-                    control: CGPoint(x: 0, y: mw * 0.2)
-                )
-            }
-            .fill(Color.white)
-            Ellipse()
-                .fill(Color(red: 0.9, green: 0.35, blue: 0.3))
-                .frame(width: mw * 0.4, height: mw * 0.3)
-                .offset(y: mw * 0.1)
-        }
-    }
-
-    // MARK: - 动画
-
-    private func triggerBlink() {
-        withAnimation(.easeOut(duration: 0.06)) { isBlinking = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(.easeOut(duration: 0.1)) { isBlinking = false }
-        }
-    }
-
-    private func animate() {
-        let t = Date().timeIntervalSinceReferenceDate
-        floatOffset = sin(t * 1.5) * 1.5
-        headTilt = sin(t * 0.8) * 0.8
     }
 }
