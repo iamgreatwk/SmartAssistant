@@ -1,0 +1,39 @@
+name: SmartAssistant
+options:
+  bundleIdPrefix: com.yourname
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"
+    INFOPLIST_FILE: SmartAssistant/Resources/Info.plist
+    PRODUCT_BUNDLE_IDENTIFIER: com.yourname.smartassistant
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    PROVISIONING_PROFILE_SPECIFIER: ""
+    ENABLE_BITCODE: NO
+
+targets:
+  SmartAssistant:
+    type: application
+    platform: iOS
+    sources:
+      - path: SmartAssistant
+        type: group
+    settings:
+      base:
+        PRODUCT_NAME: SmartAssistant
+        DISPLAY_NAME: "小智助手"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: "小智助手"
+        INFOPLIST_KEY_UILaunchScreen: ""
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+    dependencies: []
+    preBuildScripts: []
+    postBuildScripts: []
