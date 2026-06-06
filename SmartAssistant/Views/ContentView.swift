@@ -136,7 +136,7 @@ struct ChatView: View {
             .animation(.easeInOut(duration: 0.3), value: deviceRotation)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onTapGesture {
-                // 全屏点按直接开始/停止对话
+                // 全屏点按直接语音对话
                 if chatVM.isListening {
                     chatVM.stopListening()
                 } else if chatVM.isSpeaking {
@@ -146,7 +146,7 @@ struct ChatView: View {
                 }
             }
             
-            // 顶部按钮
+            // 退出按钮
             VStack {
                 HStack {
                     Spacer()
@@ -157,30 +157,17 @@ struct ChatView: View {
                     } label: {
                         Image(systemName: "arrow.down.right.and.arrow.up.left")
                             .font(.title3)
-                            .foregroundColor(.white)
+                            .foregroundColor(Color.white.opacity(0.4))
                             .padding(12)
-                            .background(Color.white.opacity(0.2))
+                            .background(Color.white.opacity(0.1))
                             .clipShape(Circle())
                     }
                     .padding(.trailing, 20)
                     .padding(.top, 50)
                 }
                 Spacer()
-                
-                // 底部状态提示
-                Text(fullscreenHint)
-                    .font(.caption)
-                    .foregroundColor(Color.white.opacity(0.5))
-                    .padding(.bottom, 50)
             }
         }
-    }
-    
-    private var fullscreenHint: String {
-        if chatVM.isListening { return "正在听..." }
-        if chatVM.isProcessing { return "思考中..." }
-        if chatVM.isSpeaking { return "说话中..." }
-        return "点击屏幕开始对话"
     }
     
     // MARK: - 状态栏
