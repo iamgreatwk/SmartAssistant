@@ -124,8 +124,8 @@ class ChatViewModel: ObservableObject {
             
             isProcessing = false
             
-            // 添加 AI 回复
-            let aiMessage = ChatMessage(role: .assistant, content: response, expression: .speaking)
+            let emotion = detectEmotion(response)
+            let aiMessage = ChatMessage(role: .assistant, content: response, expression: emotion)
             messages.append(aiMessage)
             
             // 开始语音播报
@@ -165,7 +165,8 @@ class ChatViewModel: ObservableObject {
             
             isProcessing = false
             
-            let aiMessage = ChatMessage(role: .assistant, content: response, expression: .speaking)
+            let emotion = detectEmotion(response)
+            let aiMessage = ChatMessage(role: .assistant, content: response, expression: emotion)
             messages.append(aiMessage)
             
             speakResponse(response)
@@ -184,8 +185,9 @@ class ChatViewModel: ObservableObject {
     // MARK: - TTS 播报
     
     private func speakResponse(_ text: String) {
+        let emotion = detectEmotion(text)
         conversationState = .speaking
-        currentExpression = .speaking
+        currentExpression = emotion
         
         speaker.speak(text) { [weak self] in
             DispatchQueue.main.async {
@@ -211,6 +213,73 @@ class ChatViewModel: ObservableObject {
     }
     
     // MARK: - 传感器上下文
+    
+    // MARK: - 情绪检测
+    
+    private func detectEmotion(_ text: String) -> ExpressionType {
+        let t = text.lowercased()
+        
+        // 大笑/非常开心
+        if t.contains("哈哈") || t.contains("笑死") || t.contains("🤣") || t.contains("hhh") {
+            return .veryHappy
+        }
+        // 开心
+        if t.contains("开心") || t.contains("太棒") || t.contains("真好") ||
+           t.contains("😄") || t.contains("嘿嘿") || t.contains("耶") {
+            return .happy
+        }
+        // 兴奋/惊喜
+        if t.contains("哇") || t.contains("天啊") || t.contains("太酷") ||
+           t.contains("🤩") || t.contains("厉害") || t.contains("牛") {
+            return .excited
+        }
+        // 惊讶
+        if t.contains("什么") || t.contains("真的假的") || t.contains("😲") ||
+           t.contains("不会吧") || t.contains("居然") {
+            return .surprised
+        }
+        // 生气
+        if t.contains("生气") || t.contains("烦") || t.contains("😠") ||
+           t.contains("讨厌") || t.contains("滚") {
+            return .angry
+        }
+        // 难过
+        if t.contains("难过") || t.contains("伤心") || t.contains("😢") ||
+           t.contains("哭") || t.contains("可惜") || t.contains("遗憾") {
+            return .sad
+        }
+        // 喜欢/爱
+        if t.contains("爱你") || t.contains("喜欢") || t.contains("🥰") ||
+           t.contains("亲亲") || t.contains("么么") {
+            return .love
+        }
+        // 害羞
+        if t.contains("害羞") || t.contains("😳") || t.contains("不好意思") ||
+           t.contains("脸红") {
+            return .shy
+        }
+        // 困惑
+        if t.contains("嗯") || t.contains("🤔") || t.contains("不太确定") ||
+           t.contains("奇怪") || t.contains("搞不懂") {
+            return .confused
+        }
+        // 眨眼/俏皮
+        if t.contains("😉") || t.contains("悄悄") || t.contains("秘密") ||
+           t.contains("嘿") {
+            return .wink
+        }
+        // 酷
+        if t.contains("😎") || t.contains("帅") || t.contains("酷") {
+            return .cool
+        }
+        // 困
+        if t.contains("😴") || t.contains("困") || t.contains("累了") {
+            return .sleepy
+        }
+        
+        // 默认说话表情
+        return .speaking
+    }
     
     private func collectSensorContext() -> String {
         var parts: [String] = []
