@@ -47,6 +47,7 @@ jobs:
 
       - name: Build archive
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
@@ -58,7 +59,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI" 2>&1 | tail -50
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="CI"
+          echo "Archive exit code: $?"
+          ls -la "$EXPORT_DIR/" 2>/dev/null || echo "No build dir yet"
 
       - name: Export IPA
         run: |
