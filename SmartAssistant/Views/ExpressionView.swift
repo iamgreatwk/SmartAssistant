@@ -35,7 +35,7 @@ struct ExpressionView: View {
                 var ctx = context
 
                 ctx.translateBy(x: size.width / 2, y: size.height / 2)
-                ctx.rotate(by: headTilt)
+                ctx.rotate(by: Angle(radians: headTilt))
                 ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
 
                 ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
