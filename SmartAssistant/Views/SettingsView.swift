@@ -20,7 +20,22 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // 标题栏
+            HStack {
+                Text("设置")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+                Button("保存") {
+                    saveConfig()
+                }
+                .fontWeight(.semibold)
+            }
+            .padding(.horizontal)
+            .padding(.top, 50)
+            .padding(.bottom, 12)
+            
             Form {
                 // MARK: - AI 配置
                 Section {
@@ -169,15 +184,6 @@ struct SettingsView: View {
                     Label("关于", systemImage: "info.circle")
                 }
             }
-            .navigationTitle("设置")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("保存") {
-                        saveConfig()
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
             .alert("确认清除", isPresented: $showResetAlert) {
                 Button("取消", role: .cancel) { }
                 Button("清除", role: .destructive) {
@@ -187,6 +193,7 @@ struct SettingsView: View {
                 Text("此操作将清除所有对话历史，不可恢复。")
             }
         }
+        .background(Color(.systemGroupedBackground))
     }
     
     private func saveConfig() {

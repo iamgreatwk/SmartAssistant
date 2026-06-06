@@ -1,493 +1,162 @@
 import SwiftUI
 
-// MARK: - 主视图
+// MARK: - 主视图 (纯表情 + 右滑设置)
 
 struct ContentView: View {
     @StateObject private var chatVM = ChatViewModel()
     @StateObject private var sensorVM = SensorViewModel()
     @StateObject private var permissionManager = PermissionManager()
     
-    @State private var selectedTab: Tab = .chat
-    @State private var showPermissionAlert = false
-    
-    enum Tab: String, CaseIterable {
-        case chat = "对话"
-        case settings = "设置"
-        
-        var icon: String {
-            switch self {
-            case .chat: return "message.fill"
-            case .settings: return "gearshape.fill"
-            }
-        }
-    }
-    
-    var body: some View {
-        ZStack {
-            TabView(selection: $selectedTab) {
-                ChatView(chatVM: chatVM)
-                    .tabItem {
-                        Label(Tab.chat.rawValue, systemImage: Tab.chat.icon)
-                    }
-                    .tag(Tab.chat)
-                
-                SettingsView(chatVM: chatVM, sensorVM: sensorVM)
-                    .tabItem {
-                        Label(Tab.settings.rawValue, systemImage: Tab.settings.icon)
-                    }
-                    .tag(Tab.settings)
-            }
-            .accentColor(.blue)
-        }
-        .onAppear {
-            startServices()
-        }
-        .alert("需要权限", isPresented: $showPermissionAlert) {
-            Button("去设置") { permissionManager.openSettings() }
-            Button("取消", role: .cancel) { }
-        } message: {
-            Text("小智助手需要访问麦克风和语音识别权限才能正常工作。请在设置中开启。")
-        }
-    }
-    
-    private func startServices() {
-        // 后台启动传感器（不显示UI但数据可用）
-        sensorVM.startAllSensors()
-        
-        Task {
-            await permissionManager.requestAllPermissions()
-            if permissionManager.microphoneStatus == .denied ||
-               permissionManager.speechRecognitionStatus == .denied {
-                showPermissionAlert = true
-            }
-        }
-    }
-}
-
-// MARK: - 对话视图
-
-struct ChatView: View {
-    @ObservedObject var chatVM: ChatViewModel
-    @State private var textInput: String = ""
-    @FocusState private var isInputFocused: Bool
-    @State private var isExpressionFullscreen: Bool = false
     @State private var deviceRotation: Double = 0
+    @State private var showSettings: Bool = false
+    @State private var settingsOffset: CGFloat = -UIScreen.main.bounds.width
     
     var body: some View {
-        ZStack {
-            // 正常模式
-            if !isExpressionFullscreen {
-                normalChatView
-            } else {
-                // 全屏表情模式
-                fullscreenExpressionView
+        GeometryReader { geo in
+            ZStack {
+                // 全屏表情 (始终显示)
+                Color.black.ignoresSafeArea()
+                
+                ExpressionView(
+                    expression: chatVM.currentExpression,
+                    speakingLevel: chatVM.speakingLevel,
+                    isFullscreen: true
+                )
+                .rotationEffect(.degrees(deviceRotation))
+                .animation(.easeInOut(duration: 0.3), value: deviceRotation)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onTapGesture {
+                    handleTap()
+                }
+                
+                // 右上角设置按钮
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                showSettings.toggle()
+                                settingsOffset = showSettings ? 0 : -geo.size.width
+                            }
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title3)
+                                .foregroundColor(Color.white.opacity(0.35))
+                                .padding(12)
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.top, 50)
+                    }
+                    Spacer()
+                }
+                
+                // 设置抽屉 (右滑)
+                settingsDrawer(width: geo.size.width)
+                
+                // 左边缘拖拽手势
+                leftEdgeDragZone(width: geo.size.width)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
             let orient = UIDevice.current.orientation
-            // 横屏自动进入全屏
-            let isLandscape = orient.isLandscape
-            if isLandscape != isExpressionFullscreen {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                    isExpressionFullscreen = isLandscape
-                }
-            }
-            // 更新旋转角度
-            switch orient {
-            case .landscapeLeft:  deviceRotation = -90
-            case .landscapeRight: deviceRotation = 90
-            case .portraitUpsideDown: deviceRotation = 180
-            default: deviceRotation = 0
-            }
-        }
-    }
-    
-    // MARK: - 正常对话模式
-    
-    private var normalChatView: some View {
-        VStack(spacing: 0) {
-            // 顶部状态栏
-            statusBar
-            
-            // 对话状态指示
-            stateIndicator
-            
-            // 消息列表
-            messageList
-            
-            // 输入区域
-            inputBar
-        }
-        .background(Color(.systemGroupedBackground))
-    }
-    
-    // MARK: - 全屏表情模式
-    
-    private var fullscreenExpressionView: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            ExpressionView(
-                expression: chatVM.currentExpression,
-                speakingLevel: chatVM.speakingLevel,
-                isFullscreen: true
-            )
-            .rotationEffect(.degrees(deviceRotation))
-            .animation(.easeInOut(duration: 0.3), value: deviceRotation)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .onTapGesture {
-                // 全屏点按直接语音对话
-                if chatVM.isListening {
-                    chatVM.stopListening()
-                } else if chatVM.isSpeaking {
-                    chatVM.stopSpeaking()
-                } else {
-                    chatVM.startListening()
-                }
-            }
-            
-            // 退出按钮
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                            isExpressionFullscreen = false
-                        }
-                    } label: {
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .font(.title3)
-                            .foregroundColor(Color.white.opacity(0.4))
-                            .padding(12)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.top, 50)
-                }
-                Spacer()
-            }
-        }
-    }
-    
-    // MARK: - 状态栏
-    
-    private var statusBar: some View {
-        HStack {
-            Text("小智助手")
-                .font(.headline)
-                .fontWeight(.bold)
-            
-            Spacer()
-            
-            // 全屏表情按钮
-            Button {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                    isExpressionFullscreen.toggle()
-                }
-            } label: {
-                Image(systemName: isExpressionFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-            }
-            
-            ConversationStatusBadge(state: chatVM.conversationState)
-            
-            Button {
-                chatVM.clearConversation()
-            } label: {
-                Image(systemName: "trash")
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-    }
-    
-    // MARK: - 角色视图
-    
-    private var characterView: some View {
-        ExpressionView(
-            expression: chatVM.currentExpression,
-            speakingLevel: chatVM.speakingLevel
-        )
-        .frame(height: 180)
-        .padding(.vertical, 4)
-        .onTapGesture {
-            if chatVM.conversationState == ChatViewModel.ConversationState.idle {
-                chatVM.startListening()
-            } else if chatVM.conversationState == .speaking {
-                chatVM.stopSpeaking()
-            }
-        }
-    }
-    
-    // MARK: - 状态指示器
-    
-    private var stateIndicator: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(stateColor)
-                .frame(width: 8, height: 8)
-            
-            Text(stateText)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            if chatVM.isProcessing {
-                ProgressView()
-                    .scaleEffect(0.7)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-    
-    private var stateColor: Color {
-        switch chatVM.conversationState {
-        case .idle: return .gray
-        case .listening: return .green
-        case .thinking: return .orange
-        case .speaking: return .blue
-        case .error: return .red
-        }
-    }
-    
-    private var stateText: String {
-        switch chatVM.conversationState {
-        case .idle: return "点击角色或按住输入说话"
-        case .listening: return "正在听..."
-        case .thinking: return "思考中..."
-        case .speaking: return "说话中..."
-        case .error(let msg): return "错误: \(msg)"
-        }
-    }
-    
-    // MARK: - 消息列表
-    
-    private var messageList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if chatVM.messages.isEmpty {
-                        emptyStateView
-                    }
-                    
-                    ForEach(chatVM.messages) { message in
-                        ChatBubble(message: message, expression: $chatVM.currentExpression)
-                            .id(message.id)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            }
-            .onChange(of: chatVM.messages.count) {
-                if let last = chatVM.messages.last {
-                    withAnimation {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                switch orient {
+                case .landscapeLeft:  deviceRotation = -90
+                case .landscapeRight: deviceRotation = 90
+                case .portraitUpsideDown: deviceRotation = 180
+                default: deviceRotation = 0
                 }
             }
         }
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            
-            Text("👋 你好！我是小智")
-                .font(.title2)
-                .fontWeight(.medium)
-            
-            Text("按住输入框开始说话，或者打字发消息")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-    
-    // MARK: - 输入区域
-    
-    private var inputBar: some View {
-        HStack(spacing: 10) {
-            // 语音按钮
-            Button {
-                if chatVM.isListening {
-                    chatVM.stopListening()
-                } else {
-                    chatVM.startListening()
-                }
-            } label: {
-                Image(systemName: chatVM.isListening ? "mic.fill" : "mic")
-                    .font(.title3)
-                    .foregroundColor(chatVM.isListening ? .red : .blue)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        Circle()
-                            .fill(chatVM.isListening ? Color.red.opacity(0.15) : Color.blue.opacity(0.1))
-                    )
-                    .scaleEffect(chatVM.isListening ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 0.3).repeatForever(autoreverses: true), value: chatVM.isListening)
-            }
-            
-            // 文本输入
-            HStack {
-                TextField("输入消息...", text: $textInput)
-                    .focused($isInputFocused)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        sendText()
-                    }
-                
-                if !textInput.isEmpty {
-                    Button {
-                        sendText()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(.systemGray6))
-            )
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-    }
-    
-    private func sendText() {
-        guard !textInput.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let text = textInput
-        textInput = ""
-        isInputFocused = false
-        
-        Task {
-            await chatVM.sendText(text)
-        }
-    }
-}
-
-// MARK: - 对话状态徽章
-
-struct ConversationStatusBadge: View {
-    let state: ChatViewModel.ConversationState
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(label)
-                .font(.caption)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(color.opacity(0.1))
-        .cornerRadius(12)
-    }
-    
-    private var color: Color {
-        switch state {
-        case .idle: return .gray
-        case .listening: return .green
-        case .thinking: return .orange
-        case .speaking: return .blue
-        case .error: return .red
-        }
-    }
-    
-    private var label: String {
-        switch state {
-        case .idle: return "就绪"
-        case .listening: return "收听"
-        case .thinking: return "思考"
-        case .speaking: return "播报"
-        case .error: return "出错"
-        }
-    }
-}
-
-// MARK: - 聊天气泡
-
-struct ChatBubble: View {
-    let message: ChatMessage
-    @Binding var expression: ExpressionType
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            if message.role == .assistant {
-                Text("🤖")
-                    .font(.title3)
-                    .frame(width: 36, height: 36)
-                    .background(
-                        Circle()
-                            .fill(Color.blue.opacity(0.1))
-                    )
-            }
-            
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
-                    .font(.body)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        message.role == .user ?
-                        Color.blue.opacity(0.85) :
-                        Color(.systemGray5)
-                    )
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .cornerRadius(18)
-                    .contextMenu {
-                        Button {
-                            UIPasteboard.general.string = message.content
-                        } label: {
-                            Label("复制", systemImage: "doc.on.doc")
-                        }
-                    }
-                
-                Text(formatTime(message.timestamp))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 4)
-            }
-            
-            if message.role == .user {
-                Text("👤")
-                    .font(.title3)
-                    .frame(width: 36, height: 36)
-                    .background(
-                        Circle()
-                            .fill(Color.green.opacity(0.1))
-                    )
-            }
-            
-            if message.role == .assistant {
-                Spacer(minLength: 50)
-            }
-        }
-        .padding(message.role == .user ? .leading : .trailing, 50)
         .onAppear {
-            if let expr = message.expression {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    expression = expr
-                }
+            sensorVM.startAllSensors()
+            Task {
+                await permissionManager.requestAllPermissions()
             }
         }
     }
     
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+    // MARK: - 交互
+    
+    private func handleTap() {
+        if chatVM.isListening {
+            chatVM.stopListening()
+        } else if chatVM.isSpeaking {
+            chatVM.stopSpeaking()
+        } else {
+            chatVM.startListening()
+        }
+    }
+    
+    // MARK: - 设置抽屉
+    
+    private func settingsDrawer(width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            SettingsView(chatVM: chatVM, sensorVM: sensorVM)
+                .frame(width: width * 0.85)
+                .background(Color(.systemGroupedBackground))
+            
+            // 右侧空白区 (点击关闭)
+            Color.black.opacity(0.01)
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        showSettings = false
+                        settingsOffset = -width
+                    }
+                }
+        }
+        .offset(x: settingsOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if showSettings {
+                        settingsOffset = min(0, value.translation.width)
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.width < -50 {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            showSettings = false
+                            settingsOffset = -width
+                        }
+                    } else {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            settingsOffset = 0
+                        }
+                    }
+                }
+        )
+    }
+    
+    // MARK: - 左边缘拖拽
+    
+    private func leftEdgeDragZone(width: CGFloat) -> some View {
+        HStack {
+            Color.white.opacity(0.001)
+                .frame(width: 30)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            if !showSettings && value.startLocation.x < 30 {
+                                settingsOffset = min(0, -width + value.translation.width)
+                            }
+                        }
+                        .onEnded { value in
+                            if value.translation.width > 60 {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    showSettings = true
+                                    settingsOffset = 0
+                                }
+                            } else {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    showSettings = false
+                                    settingsOffset = -width
+                                }
+                            }
+                        }
+                )
+            Spacer()
+        }
     }
 }
