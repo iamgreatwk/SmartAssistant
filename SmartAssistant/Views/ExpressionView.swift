@@ -25,28 +25,24 @@ struct ExpressionView: View {
     var body: some View {
         GeometryReader { geo in
             let s = size ?? min(geo.size.width, geo.size.height)
-            let scale: CGFloat = isFullscreen ? 1.8 : 1.0
-            let lw: CGFloat = isFullscreen ? 2.0 : 1.0
             
             ZStack {
                 Color.black
                 
-                // 表情元素垂直居中 (固定行高防漂移)
-                VStack(spacing: s * 0.08 * scale) {
-                    eyeRow(size: s, scale: scale, lineWidth: lw)
-                        .frame(height: s * 0.06 * scale)
+                VStack(spacing: s * 0.08) {
+                    eyeRow(size: s)
+                        .frame(height: s * 0.07)
                     
-                    mouthRow(size: s, scale: scale, lineWidth: lw)
-                        .frame(height: s * 0.05 * scale)
+                    mouthRow(size: s)
+                        .frame(height: s * 0.06)
                 }
                 
-                // 腮红覆盖层
-                blushLayer(size: s, scale: scale)
+                blushLayer(size: s)
             }
             .frame(width: s, height: s)
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
             .rotationEffect(.degrees(headTilt))
-            .offset(y: floatOffset * scale)
+            .offset(y: floatOffset)
         }
         .onReceive(animTimer) { _ in animate() }
         .onReceive(blinkTimer) { _ in triggerBlink() }
@@ -54,16 +50,16 @@ struct ExpressionView: View {
     
     // MARK: - 眼睛行
     
-    private func eyeRow(size: CGFloat, scale: CGFloat, lineWidth: CGFloat) -> some View {
+    private func eyeRow(size: CGFloat) -> some View {
         let p = expression.params
-        let r = size * 0.028 * p.eyeScale * scale
-        let gap = size * 0.12 * scale
+        let r = size * 0.028 * p.eyeScale
+        let gap = size * 0.12
         
         if expression == .sleepy {
             return AnyView(
                 HStack(spacing: gap) {
-                    Capsule().fill(Color.white).frame(width: r * 3, height: size * 0.008 * scale)
-                    Capsule().fill(Color.white).frame(width: r * 3, height: size * 0.008 * scale)
+                    Capsule().fill(Color.white).frame(width: r * 3, height: size * 0.008)
+                    Capsule().fill(Color.white).frame(width: r * 3, height: size * 0.008)
                 }
             )
         }
@@ -75,14 +71,14 @@ struct ExpressionView: View {
                         p.move(to: CGPoint(x: -r, y: -r * 0.4))
                         p.addLine(to: CGPoint(x: r, y: r * 0.4))
                     }
-                    .stroke(Color.white, lineWidth: size * 0.014 * lineWidth)
+                    .stroke(Color.white, lineWidth: size * 0.014)
                     .frame(width: r * 2, height: r * 2)
                     
                     Path { p in
                         p.move(to: CGPoint(x: -r, y: -r * 0.4))
                         p.addLine(to: CGPoint(x: r, y: r * 0.4))
                     }
-                    .stroke(Color.white, lineWidth: size * 0.014 * lineWidth)
+                    .stroke(Color.white, lineWidth: size * 0.014)
                     .frame(width: r * 2, height: r * 2)
                 }
             )
@@ -90,89 +86,89 @@ struct ExpressionView: View {
         
         return AnyView(
             HStack(spacing: gap) {
-                eye(r: r, params: p, scale: scale, isWink: false)
-                eye(r: r, params: p, scale: scale, isWink: expression == .wink)
+                eye(r: r, params: p, isWink: false)
+                eye(r: r, params: p, isWink: expression == .wink)
             }
         )
     }
     
-    private func eye(r: CGFloat, params: ExpressionType.ExpressionParams, scale: CGFloat, isWink: Bool) -> some View {
+    private func eye(r: CGFloat, params: ExpressionType.ExpressionParams, isWink: Bool) -> some View {
         let h = isWink ? r * 0.15 : (isBlinking ? r * 0.15 : r * 2)
         return ZStack {
             Circle()
                 .fill(Color.white)
                 .frame(width: r * 2, height: h)
-                .offset(y: params.eyeOffsetY * scale)
+                .offset(y: params.eyeOffsetY)
             
             if params.pupilScale > 0.35 && !isBlinking && !isWink {
                 Circle()
                     .fill(Color.black)
                     .frame(width: r * 1.3 * params.pupilScale, height: r * 1.3 * params.pupilScale)
-                    .offset(x: params.pupilOffsetX * scale, y: params.eyeOffsetY * scale)
+                    .offset(x: params.pupilOffsetX, y: params.eyeOffsetY)
             }
         }
     }
     
     // MARK: - 嘴巴行
     
-    private func mouthRow(size: CGFloat, scale: CGFloat, lineWidth: CGFloat) -> some View {
+    private func mouthRow(size: CGFloat) -> some View {
         let p = expression.params
-        let w = size * 0.08 * p.mouthScale * scale
+        let w = size * 0.08 * p.mouthScale
         
         return Group {
             switch p.mouthType {
             case .normal:
-                Capsule().fill(Color.white).frame(width: w * 1.2, height: size * 0.008 * scale)
+                Capsule().fill(Color.white).frame(width: w * 1.2, height: size * 0.008)
             case .smile:
-                smileArc(w: w, size: size, lw: lineWidth)
+                smileArc(w: w, size: size)
             case .bigSmile:
-                bigSmile(w: w, s: size, scale: scale)
+                bigSmile(w: w)
             case .open:
                 let lvl = max(0.15, speakingLevel)
                 Capsule()
                     .fill(Color.white)
-                    .frame(width: w * 0.8, height: max(size * 0.014 * scale, size * 0.022 * lvl * scale))
+                    .frame(width: w * 0.8, height: max(size * 0.014, size * 0.022 * lvl))
             case .sad:
-                sadArc(w: w, size: size, lw: lineWidth)
+                sadArc(w: w, size: size)
             case .surprised:
-                RoundedRectangle(cornerRadius: size * 0.01 * scale)
+                RoundedRectangle(cornerRadius: size * 0.01)
                     .fill(Color.white)
                     .frame(width: w * 0.65, height: w * 0.7)
             case .smirk:
-                smirk(w: w, size: size, lw: lineWidth)
+                smirk(w: w, size: size)
             case .kiss:
                 Circle()
-                    .stroke(Color(red: 1, green: 0.45, blue: 0.55), lineWidth: size * 0.009 * lineWidth)
+                    .stroke(Color(red: 1, green: 0.45, blue: 0.55), lineWidth: size * 0.009)
                     .frame(width: w * 0.65, height: w * 0.65)
             }
         }
     }
     
-    private func smileArc(w: CGFloat, size: CGFloat, lw: CGFloat) -> some View {
+    private func smileArc(w: CGFloat, size: CGFloat) -> some View {
         Path { p in
             p.move(to: CGPoint(x: -w, y: w * 0.15))
             p.addQuadCurve(to: CGPoint(x: w, y: w * 0.15), control: CGPoint(x: 0, y: w * 0.6))
         }
-        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012 * lw, lineCap: .round))
+        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012, lineCap: .round))
     }
     
-    private func sadArc(w: CGFloat, size: CGFloat, lw: CGFloat) -> some View {
+    private func sadArc(w: CGFloat, size: CGFloat) -> some View {
         Path { p in
             p.move(to: CGPoint(x: -w, y: 0))
             p.addQuadCurve(to: CGPoint(x: w, y: 0), control: CGPoint(x: 0, y: -w * 0.5))
         }
-        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012 * lw, lineCap: .round))
+        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012, lineCap: .round))
     }
     
-    private func smirk(w: CGFloat, size: CGFloat, lw: CGFloat) -> some View {
+    private func smirk(w: CGFloat, size: CGFloat) -> some View {
         Path { p in
             p.move(to: CGPoint(x: -w * 0.7, y: w * 0.2))
             p.addQuadCurve(to: CGPoint(x: w, y: -w * 0.05), control: CGPoint(x: w * 0.2, y: w * 0.45))
         }
-        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012 * lw, lineCap: .round))
+        .stroke(Color.white, style: StrokeStyle(lineWidth: size * 0.012, lineCap: .round))
     }
     
-    private func bigSmile(w: CGFloat, s: CGFloat, scale: CGFloat) -> some View {
+    private func bigSmile(w: CGFloat) -> some View {
         ZStack {
             Path { p in
                 p.move(to: CGPoint(x: -w, y: 0))
@@ -189,19 +185,19 @@ struct ExpressionView: View {
     
     // MARK: - 腮红
     
-    private func blushLayer(size: CGFloat, scale: CGFloat) -> some View {
+    private func blushLayer(size: CGFloat) -> some View {
         let p = expression.params
         guard p.cheekColor > 0 else { return AnyView(EmptyView()) }
         let c = Color(red: 1, green: 0.35, blue: 0.45).opacity(p.cheekColor)
-        let b = size * 0.032 * scale
-        let gap = size * 0.12 * scale + b * 2
+        let b = size * 0.032
+        let gap = size * 0.12 + b * 2
         
         return AnyView(
             HStack(spacing: gap) {
                 RoundedRectangle(cornerRadius: b * 0.3).fill(c).frame(width: b, height: b)
                 RoundedRectangle(cornerRadius: b * 0.3).fill(c).frame(width: b, height: b)
             }
-            .offset(y: size * 0.008 * scale)
+            .offset(y: size * 0.008)
         )
     }
     

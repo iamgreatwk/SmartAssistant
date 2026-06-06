@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var deviceRotation: Double = 0
     @State private var showSettings: Bool = false
     @State private var settingsOffset: CGFloat = -UIScreen.main.bounds.width
+    @State private var hasAutoStarted = false
     
     var body: some View {
         GeometryReader { geo in
@@ -69,13 +70,22 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            guard !hasAutoStarted else { return }
+            hasAutoStarted = true
+            
+            // 后台启动传感器
             sensorVM.startAllSensors()
+            
+            // 等权限完成后再自动开始对话
             Task {
                 await permissionManager.requestAllPermissions()
-            }
-            // 打开app自动开始对话
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                chatVM.startListening()
+                // 给系统一点时间稳定
+                try? await Task.sleep(for: .milliseconds(500))
+                // 确认关键权限已授权再开始
+                if permissionManager.microphoneStatus != .denied,
+                   permissionManager.speechRecognitionStatus != .denied {
+                    chatVM.startListening()
+                }
             }
         }
     }

@@ -42,6 +42,11 @@ class SpeechRecognitionService: NSObject, ObservableObject {
     // MARK: - 开始识别
     
     func startRecognition() throws {
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            throw NSError(domain: "SpeechRecognition", code: -3,
+                userInfo: [NSLocalizedDescriptionKey: "语音识别未授权"])
+        }
+        
         // 停止之前的识别
         stopRecognition()
         

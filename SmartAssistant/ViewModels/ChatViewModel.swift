@@ -85,6 +85,7 @@ class ChatViewModel: ObservableObject {
     
     func startListening() {
         guard !isListening else { return }
+        guard !isSpeaking else { return }  // 说话中不启动
         
         do {
             try speechRecognition.startRecognition()
@@ -92,11 +93,13 @@ class ChatViewModel: ObservableObject {
             conversationState = .listening
             currentExpression = .listening
         } catch {
-            errorMessage = "语音识别启动失败: \(error.localizedDescription)"
+            print("语音识别启动失败: \(error.localizedDescription)")
+            // 不设 errorMessage 避免 UI 错误提示
         }
     }
     
     func stopListening() {
+        guard isListening else { return }
         speechRecognition.stopRecognition()
         isListening = false
     }
