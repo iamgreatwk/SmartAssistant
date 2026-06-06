@@ -18,61 +18,71 @@ struct ExpressionView: View {
 
     var body: some View {
         GeometryReader { geo in
-            TimelineView(.animation) { timeline in
+            let s = size ?? min(geo.size.width, geo.size.height)
+            FaceCanvas(
+                s: s,
+                expression: expression,
+                speakingLevel: speakingLevel
+            )
+        }
+    }
+}
 
-                let s = size ?? min(geo.size.width, geo.size.height)
-                let scale = s / 100
+// MARK: - Canvas 绘制（独立 View 避免类型推断问题）
 
-                let t = timeline.date.timeIntervalSinceReferenceDate
-                let floatOffset = sin(t * 1.5) * 1.5
-                let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
-                let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
-                let isBlinking = blinkPhase < 0.15
+private struct FaceCanvas: View {
+    let s: CGFloat
+    let expression: ExpressionType
+    let speakingLevel: CGFloat
 
-                Canvas { context, size in
-                    var ctx = context
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let scale = s / 100
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let floatOffset = sin(t * 1.5) * 1.5
+            let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
+            let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
+            let isBlinking = blinkPhase < 0.15
 
-                    // 把画布原点移到中间，应用旋转和浮动
-                    ctx.translateBy(x: size.width / 2, y: size.height / 2)
-                    ctx.rotate(by: headTilt)
-                    ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
+            Canvas { context, size in
+                var ctx = context
 
-                    // 黑色背景
-                    ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
+                // 画布居中，应用旋转和浮动
+                ctx.translateBy(x: size.width / 2, y: size.height / 2)
+                ctx.rotate(by: headTilt)
+                ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
 
-                    // 腮红
-                    drawCheeks(ctx: ctx, scale: scale, isBlinking: isBlinking)
+                // 黑色背景
+                ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
 
-                    // 眼睛
-                    drawEyes(ctx: ctx, scale: scale, isBlinking: isBlinking)
+                // 腮红
+                drawCheeks(ctx: ctx, scale: scale)
 
-                    // 嘴巴
-                    drawMouth(ctx: ctx, scale: scale, isBlinking: isBlinking)
-                }
+                // 眼睛
+                drawEyes(ctx: ctx, scale: scale, isBlinking: isBlinking)
+
+                // 嘴巴
+                drawMouth(ctx: ctx, scale: scale)
             }
         }
     }
 
     // MARK: - 腮红
 
-    private func drawCheeks(ctx: GraphicsContext, scale: CGFloat, isBlinking: Bool) {
+    private func drawCheeks(ctx: GraphicsContext, scale: CGFloat) {
         let p = expression.params
         guard p.cheek > 0 else { return }
 
         let bs = 5 * p.cheek * scale
         let bx = 20 * scale
         let by = 48 * scale
-
         let color = GraphicsContext.Shading.color(Color(red: 1, green: 0.35, blue: 0.45).opacity(p.cheek * 0.4))
 
         let leftRect = CGRect(x: 50 * scale - bx - bs / 2, y: by - bs * 0.35, width: bs, height: bs * 0.7)
         let rightRect = CGRect(x: 50 * scale + bx - bs / 2, y: by - bs * 0.35, width: bs, height: bs * 0.7)
 
-        let leftPath = Path(roundedRect: leftRect, cornerRadius: bs * 0.2)
-        let rightPath = Path(roundedRect: rightRect, cornerRadius: bs * 0.2)
-
-        ctx.fill(leftPath, with: color)
-        ctx.fill(rightPath, with: color)
+        ctx.fill(Path(roundedRect: leftRect, cornerRadius: bs * 0.2), with: color)
+        ctx.fill(Path(roundedRect: rightRect, cornerRadius: bs * 0.2), with: color)
     }
 
     // MARK: - 眼睛
@@ -88,10 +98,8 @@ struct ExpressionView: View {
         let cy = 38 * scale
         let ew = 4.5 * p.eyeW * scale
         let eh = 4.5 * p.eyeH * scale
-
         let isWink = (expression == .wink && isRight)
 
-        // 困了：横线
         if p.eyeType == .lines {
             var capsule = Path()
             capsule.addEllipse(in: CGRect(x: cx - ew * 1.25, y: cy - 0.75 * scale, width: ew * 2.5, height: 1.5 * scale))
@@ -99,7 +107,6 @@ struct ExpressionView: View {
             return
         }
 
-        // 生气：斜线
         if p.eyeType == .slant {
             var line = Path()
             line.move(to: CGPoint(x: cx - ew, y: cy - eh * 0.4))
@@ -108,7 +115,6 @@ struct ExpressionView: View {
             return
         }
 
-        // 大笑：弧形眯眼
         if p.eyeType == .arches {
             var arc = Path()
             arc.move(to: CGPoint(x: cx - ew, y: cy + eh))
@@ -117,15 +123,12 @@ struct ExpressionView: View {
             return
         }
 
-        // 默认：圆眼
         let displayH = isWink ? ew * 0.15 : (isBlinking ? ew * 0.15 : eh * 2)
 
-        // 眼白
         var eyeCircle = Path()
         eyeCircle.addEllipse(in: CGRect(x: cx - ew, y: cy - displayH / 2, width: ew * 2, height: displayH))
         ctx.fill(eyeCircle, with: .color(.white))
 
-        // 瞳孔
         let pr = ew * 0.35 * p.pupil
         if pr > 0.5 * scale && !isBlinking && !isWink {
             let pupilX: CGFloat = {
@@ -141,7 +144,7 @@ struct ExpressionView: View {
 
     // MARK: - 嘴巴
 
-    private func drawMouth(ctx: GraphicsContext, scale: CGFloat, isBlinking: Bool) {
+    private func drawMouth(ctx: GraphicsContext, scale: CGFloat) {
         let p = expression.params
         let mw = 8 * p.mouthW * scale
         let cx: CGFloat = 50 * scale
@@ -160,7 +163,6 @@ struct ExpressionView: View {
             ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
 
         case .bigSmile:
-            // 填色 D 形张嘴
             var shape = Path()
             shape.move(to: CGPoint(x: cx - mw, y: cy))
             shape.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.6))
@@ -168,7 +170,6 @@ struct ExpressionView: View {
             shape.closeSubpath()
             ctx.fill(shape, with: .color(.white))
 
-            // 舌头
             var tongue = Path()
             tongue.addEllipse(in: CGRect(x: cx - mw * 0.2, y: cy + mw * 0.05, width: mw * 0.4, height: mw * 0.3))
             ctx.fill(tongue, with: .color(Color(red: 0.9, green: 0.35, blue: 0.3)))
