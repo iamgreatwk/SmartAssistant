@@ -42,23 +42,22 @@ struct ExpressionView: View {
             Canvas { context, size in
                 var ctx = context
 
-                // 居中绘制，浮动画效果
-                ctx.translateBy(x: size.width / 2, y: size.height / 2 + floatOffset)
+                // 原点移到 (s/2, s/2)，s×s 区域居中绘制
+                ctx.translateBy(x: (size.width - s) / 2 + s / 2,
+                                y: (size.height - s) / 2 + s / 2 + floatOffset)
 
                 // 背景
-                ctx.fill(Path(CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)), with: .color(.black))
+                ctx.fill(Path(CGRect(x: -s / 2, y: -s / 2, width: s, height: s)), with: .color(.black))
 
                 let ep = expression.roboParams
                 let dp = displayParams
 
-                // 平滑过渡后的参数
+                // 平滑过渡
                 let lerp = { (a: CGFloat, b: CGFloat) -> CGFloat in (a + b) / 2 }
                 let currentW = lerp(dp.eyeW, ep.eyeW)
                 let currentH = lerp(dp.eyeH, ep.eyeH)
                 let currentBR = lerp(dp.borderRadius, ep.borderRadius)
                 let currentSB = lerp(dp.spaceBetween, ep.spaceBetween)
-
-                // 眼皮插值
                 let lTired = lerp(dp.leftTired, ep.leftTired)
                 let rTired = lerp(dp.rightTired, ep.rightTired)
                 let lAngry = lerp(dp.leftAngry, ep.leftAngry)
@@ -71,28 +70,24 @@ struct ExpressionView: View {
                 let rhMul = lerp(dp.rightHeightMul, ep.rightHeightMul)
                 let yOff = lerp(dp.yOffset, ep.yOffset)
 
-                // 眼尺寸映射
+                // 尺寸映射
                 let eyeScale = scale * 0.25
                 let ew = currentW * eyeScale
                 let eh = currentH * eyeScale
                 let br = currentBR * eyeScale
                 let sb = currentSB * eyeScale
 
-                // 眼睛高度（眨眼时压缩）
                 let leftH = blinking ? ew * 0.08 : eh * lhMul
                 let rightH = blinking ? ew * 0.08 : eh * rhMul
 
-                // 视线偏移
                 let lookOffsetX = smoothLookX * 8 * scale
                 let lookOffsetY = smoothLookY * 6 * scale
 
-                // 垂直居中：100单位坐标系中眼中心在 y=36，原点在屏幕中心
-                let eyeCY = (36 - 50) * scale + yOff * scale + lookOffsetY
-
+                // 位置：100单位中眼中心在 y=36（即 canvas 中 y = 36*scale - s/2）
+                let eyeCY = 36 * scale - s / 2 + yOff * scale + lookOffsetY
                 let leftY = eyeCY - leftH / 2
                 let rightY = eyeCY - rightH / 2
 
-                // 水平居中
                 let totalW = ew * 2 + sb
                 let leftX = -totalW / 2 + lookOffsetX
                 let rightX = leftX + ew + sb
