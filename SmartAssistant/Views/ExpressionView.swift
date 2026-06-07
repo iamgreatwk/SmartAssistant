@@ -9,19 +9,27 @@ struct ExpressionView: View {
     var size: CGFloat? = nil
     let isFullscreen: Bool
 
+    /// 视线偏移（-1~1，-1=左/上，0=中心，+1=右/下）
+    var lookX: CGFloat = 0
+    var lookY: CGFloat = 0
+
     @State private var displayDate = Date()
     @State private var displayParams: ExpressionType.RoboEyesParams
     @State private var blinking = false
     @State private var blinkTimer = 0
     @State private var savedLeftH: CGFloat = 1
     @State private var savedRightH: CGFloat = 1
+    @State private var smoothLookX: CGFloat = 0
+    @State private var smoothLookY: CGFloat = 0
 
     private let timer = Timer.publish(every: 0.03, on: .main, in: .common).autoconnect()
 
-    init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0, isFullscreen: Bool = false) {
+    init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0, isFullscreen: Bool = false, lookX: CGFloat = 0, lookY: CGFloat = 0) {
         self.expression = expression
         self.size = size
         self.isFullscreen = isFullscreen
+        self.lookX = lookX
+        self.lookY = lookY
         self._displayParams = State(initialValue: expression.roboParams)
     }
 
@@ -79,21 +87,25 @@ struct ExpressionView: View {
                 let leftY = 36 * scale - leftH / 2 + yOff * scale
                 let rightY = 36 * scale - rightH / 2 + yOff * scale
 
-                // 居中计算左眼 X
+                // 居中计算左眼 X，加上视线偏移
+                let lookOffsetX = smoothLookX * 8 * scale  // 视线水平偏移
+                let lookOffsetY = smoothLookY * 6 * scale  // 视线垂直偏移
                 let totalW = ew * 2 + sb
-                let leftX = (50 * scale) - totalW / 2
+                let leftX = (50 * scale) - totalW / 2 + lookOffsetX
                 let rightX = leftX + ew + sb
+                let lyAdjusted = leftY + lookOffsetY
+                let ryAdjusted = rightY + lookOffsetY
 
                 let bgColor = GraphicsContext.Shading.color(.black)
                 let mainColor = GraphicsContext.Shading.color(Color(red: 0.49, green: 0.99, blue: 0)) // #7cfc00 绿色
 
                 // 绘制左眼
-                drawRoboEye(ctx: ctx, x: leftX, y: leftY, w: ew, h: leftH, br: br,
+                drawRoboEye(ctx: ctx, x: leftX, y: lyAdjusted, w: ew, h: leftH, br: br,
                             tired: lTired, angry: lAngry, happy: lHappy, flat: lFlat,
                             isLeft: true, mainColor: mainColor, bgColor: bgColor)
 
                 // 绘制右眼
-                drawRoboEye(ctx: ctx, x: rightX, y: rightY, w: ew, h: rightH, br: br,
+                drawRoboEye(ctx: ctx, x: rightX, y: ryAdjusted, w: ew, h: rightH, br: br,
                             tired: rTired, angry: rAngry, happy: rHappy, flat: rFlat,
                             isLeft: false, mainColor: mainColor, bgColor: bgColor)
 
@@ -122,6 +134,11 @@ struct ExpressionView: View {
             displayParams.leftHeightMul = lerp(displayParams.leftHeightMul, ep.leftHeightMul)
             displayParams.rightHeightMul = lerp(displayParams.rightHeightMul, ep.rightHeightMul)
             displayParams.yOffset = lerp(displayParams.yOffset, ep.yOffset)
+
+            // 视线平滑过渡
+            let lerpF = { (a: CGFloat, b: CGFloat) -> CGFloat in a + (b - a) * 0.12 }
+            smoothLookX = lerpF(smoothLookX, lookX)
+            smoothLookY = lerpF(smoothLookY, lookY)
 
             // 自动眨眼
             let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)

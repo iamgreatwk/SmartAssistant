@@ -21,7 +21,9 @@ struct ContentView: View {
                 ExpressionView(
                     expression: chatVM.currentExpression,
                     speakingLevel: chatVM.speakingLevel,
-                    isFullscreen: true
+                    isFullscreen: true,
+                    lookX: chatVM.lookX,
+                    lookY: chatVM.lookY
                 )
                 .rotationEffect(.degrees(deviceRotation))
                 .animation(.easeInOut(duration: 0.3), value: deviceRotation)

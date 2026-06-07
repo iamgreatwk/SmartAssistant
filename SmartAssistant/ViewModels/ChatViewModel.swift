@@ -19,6 +19,10 @@ class ChatViewModel: ObservableObject {
     @Published var showSettings: Bool = false
     @Published var ttsConfig = TTSConfig()
     
+    // 视线方向（-1~1，-1=左/上，0=中心，+1=右/下）
+    @Published var lookX: CGFloat = 0
+    @Published var lookY: CGFloat = 0
+    
     // 对话状态
     @Published var conversationState: ConversationState = .idle
     
@@ -79,6 +83,70 @@ class ChatViewModel: ObservableObject {
                 self?.speaker.updateConfig(config)
             }
             .store(in: &cancellables)
+        
+        // 表情丰富化定时器 — 每 1.5s 微调一次视线和表情
+        Timer.publish(every: 1.5, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.enrichExpression()
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - 表情丰富化
+    
+    private func enrichExpression() {
+        switch conversationState {
+        case .listening:
+            // 聆听时：偶尔左右微动，模拟"认真听"
+            if Int.random(in: 0...2) == 0 {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    lookX = CGFloat.random(in: -0.3...0.3)
+                    lookY = CGFloat.random(in: -0.15...0.15)
+                }
+            }
+            
+        case .thinking:
+            // 思考时：眼睛往上/旁边看，偶尔眨眼
+            let dirs: [(CGFloat, CGFloat)] = [(0, -0.4), (0.3, -0.3), (-0.3, -0.3), (0, 0)]
+            if Int.random(in: 0...3) == 0 {
+                let d = dirs.randomElement()!
+                withAnimation(.easeInOut(duration: 0.6)) {
+                    lookX = d.0
+                    lookY = d.1
+                }
+            }
+            
+        case .speaking:
+            // 说话时：偶尔变换视线方向，配合情绪
+            if Int.random(in: 0...4) == 0 {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    lookX = CGFloat.random(in: -0.2...0.2)
+                    lookY = CGFloat.random(in: -0.25...0.25)
+                }
+            }
+            
+        case .idle:
+            // 空闲时：随机扫视，模拟自然状态
+            if Int.random(in: 0...5) == 0 {
+                let dirs: [(CGFloat, CGFloat)] = [
+                    (0, 0), (0.5, 0), (-0.5, 0),
+                    (0, 0.3), (0, -0.3), (0.3, 0.2), (-0.3, 0.2)
+                ]
+                let d = dirs.randomElement()!
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    lookX = d.0
+                    lookY = d.1
+                }
+            }
+            
+        case .error:
+            // 出错时：不安地左右看
+            withAnimation(.easeInOut(duration: 0.3)) {
+                lookX = CGFloat.random(in: -0.4...0.4)
+                lookY = CGFloat.random(in: 0.1...0.3)
+            }
+        }
     }
     
     // MARK: - 语音交互
@@ -92,9 +160,9 @@ class ChatViewModel: ObservableObject {
             isListening = true
             conversationState = .listening
             currentExpression = .listening
+            lookX = 0; lookY = -0.2  // 微微上看的专注表情
         } catch {
             print("语音识别启动失败: \(error.localizedDescription)")
-            // 不设 errorMessage 避免 UI 错误提示
         }
     }
     
@@ -117,6 +185,7 @@ class ChatViewModel: ObservableObject {
         messages.append(userMessage)
         conversationState = .thinking
         currentExpression = .thinking
+        lookX = 0; lookY = -0.3  // 思考时眼睛看上方
         
         // 收集传感器上下文
         let sensorContext = collectSensorContext()
@@ -138,6 +207,7 @@ class ChatViewModel: ObservableObject {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
             currentExpression = .sad
+            lookX = 0; lookY = 0.2  // 难过时眼神下移
             
             let errorMsg = ChatMessage(role: .assistant, 
                                        content: "抱歉，我暂时无法回应: \(error.localizedDescription)",
@@ -160,6 +230,7 @@ class ChatViewModel: ObservableObject {
         isProcessing = true
         conversationState = .thinking
         currentExpression = .thinking
+        lookX = 0; lookY = -0.3  // 思考时眼睛看上方
         
         let sensorContext = collectSensorContext()
         
@@ -177,6 +248,7 @@ class ChatViewModel: ObservableObject {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
             currentExpression = .sad
+            lookX = 0; lookY = 0.2
             
             let errorMsg = ChatMessage(role: .assistant,
                                        content: "出了点问题: \(error.localizedDescription)",
@@ -191,6 +263,7 @@ class ChatViewModel: ObservableObject {
         let emotion = detectEmotion(text)
         conversationState = .speaking
         currentExpression = emotion
+        lookX = 0; lookY = 0  // 说话时正视前方
         
         // 过滤掉 emoji，不让 TTS 读出来
         let cleaned = text.filter { !$0.isEmoji }
@@ -198,6 +271,7 @@ class ChatViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.conversationState = .idle
                 self?.currentExpression = .normal
+                self?.lookX = 0; self?.lookY = 0
                 self?.isSpeaking = false
                 
                 // 如果开启自动监听，继续监听
