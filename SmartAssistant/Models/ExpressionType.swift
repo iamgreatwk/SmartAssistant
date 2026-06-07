@@ -1,6 +1,8 @@
 import Foundation
 
-/// StackChan 表情类型
+/// 小智表情类型 — 基于 RoboEyes 算法
+/// 眼睛：填充圆角矩形 + 三角形/矩形眼皮遮盖
+/// 嘴巴：8 种嘴型（保持不变）
 enum ExpressionType: String, CaseIterable, Codable {
     case normal     // 正常
     case happy      // 开心
@@ -18,6 +20,11 @@ enum ExpressionType: String, CaseIterable, Codable {
     case cool       // 酷
     case shy        // 害羞
     case excited    // 兴奋(星星眼)
+    // --- 新增 RoboEyes 情绪 ---
+    case scared     // 害怕
+    case bored      // 无聊
+    case focused    // 专注
+    case suspicious // 怀疑
 
     var displayName: String {
         switch self {
@@ -37,6 +44,10 @@ enum ExpressionType: String, CaseIterable, Codable {
         case .cool: return "酷"
         case .shy: return "害羞"
         case .excited: return "兴奋"
+        case .scared: return "害怕"
+        case .bored: return "无聊"
+        case .focused: return "专注"
+        case .suspicious: return "怀疑"
         }
     }
 
@@ -58,16 +69,44 @@ enum ExpressionType: String, CaseIterable, Codable {
         case .cool: return "😎"
         case .shy: return "😳"
         case .excited: return "🤩"
+        case .scared: return "😨"
+        case .bored: return "😑"
+        case .focused: return "🧐"
+        case .suspicious: return "🤨"
         }
     }
 
-    /// 眼型
-    enum EyeType {
-        case dots      // 圆眼 (默认)
-        case arches    // 弧形眯眼 (大笑)
-        case slant     // 斜线 (生气)
-        case lines     // 横线 (困)
-        case big       // 大圆眼 (惊讶/兴奋)
+    // MARK: - RoboEyes 参数
+
+    struct RoboEyesParams {
+        /// 眼睛尺寸
+        var eyeW: CGFloat = 70
+        var eyeH: CGFloat = 58
+        var borderRadius: CGFloat = 24
+        var spaceBetween: CGFloat = 20
+
+        /// 左眼眼皮（0～1，越大遮盖越多）
+        var leftTired: CGFloat = 0     // 外→内三角（疲惫）
+        var leftAngry: CGFloat = 0     // 内→外三角（生气）
+        var leftHappy: CGFloat = 0     // 底部上遮（开心下眼睑）
+        var leftFlat: CGFloat = 0      // 平顶遮盖（无聊）
+
+        /// 右眼眼皮（通常与左眼一致，可不对称）
+        var rightTired: CGFloat = 0
+        var rightAngry: CGFloat = 0
+        var rightHappy: CGFloat = 0
+        var rightFlat: CGFloat = 0
+
+        /// 单眼高度倍率（1.0=正常，0.08=几乎闭合，1.2=放大）
+        var leftHeightMul: CGFloat = 1.0
+        var rightHeightMul: CGFloat = 1.0
+
+        /// 垂直偏移（正值=下移，负值=上移）
+        var yOffset: CGFloat = 0
+
+        /// 嘴型参数（保持不变）
+        var mouthType: MouthType = .line
+        var mouthW: CGFloat = 1.0
     }
 
     /// 嘴型
@@ -82,121 +121,144 @@ enum ExpressionType: String, CaseIterable, Codable {
         case kiss       // 亲亲 ◎
     }
 
-    /// 表情参数 — 完全匹配 HTML 预览
-    struct ExpressionParams {
-        var eyeType: EyeType = .dots
-        var eyeW: CGFloat = 1.0       // 眼宽缩放
-        var eyeH: CGFloat = 1.0       // 眼高缩放
-        var pupil: CGFloat = 0        // 瞳孔半径系数 (0=无瞳孔)
-        var pupilL: Bool = false      // 左瞳孔偏移
-        var pupilR: Bool = false      // 右瞳孔偏移
-        var mouthType: MouthType = .line
-        var mouthW: CGFloat = 1.0     // 嘴宽缩放
-        var cheek: CGFloat = 0        // 腮红强度 0-1
-    }
-
-    var params: ExpressionParams {
+    /// 当前表情的 RoboEyes 参数
+    var roboParams: RoboEyesParams {
         switch self {
         case .normal:
-            return ExpressionParams()
+            return RoboEyesParams()
 
         case .happy:
-            return ExpressionParams(
-                eyeW: 0.9, eyeH: 0.9,
-                mouthType: .smile, mouthW: 1.0,
-                cheek: 0.5
+            return RoboEyesParams(
+                eyeW: 64, eyeH: 50, borderRadius: 22, spaceBetween: 22,
+                leftHappy: 0.48, rightHappy: 0.48,
+                mouthType: .smile, mouthW: 1.0
             )
 
         case .veryHappy:
-            return ExpressionParams(
-                eyeType: .arches, eyeW: 0.6, eyeH: 0.6,
-                mouthType: .bigSmile, mouthW: 1.3,
-                cheek: 0.8
+            return RoboEyesParams(
+                eyeW: 56, eyeH: 46, borderRadius: 26, spaceBetween: 24,
+                leftHappy: 0.60, rightHappy: 0.60,
+                mouthType: .bigSmile, mouthW: 1.3
             )
 
         case .sad:
-            return ExpressionParams(
+            return RoboEyesParams(
+                eyeW: 64, eyeH: 50, borderRadius: 22, spaceBetween: 26,
+                leftTired: 0.25, rightTired: 0.25,
+                yOffset: 4,
                 mouthType: .sad, mouthW: 0.9
             )
 
         case .angry:
-            return ExpressionParams(
-                eyeType: .slant,
-                pupil: 0.6,
-                mouthType: .line, mouthW: 0.8,
-                cheek: 0.7
+            return RoboEyesParams(
+                eyeW: 68, eyeH: 56, borderRadius: 18, spaceBetween: 18,
+                leftAngry: 0.5, rightAngry: 0.5,
+                mouthType: .line, mouthW: 0.8
             )
 
         case .surprised:
-            return ExpressionParams(
-                eyeType: .big, eyeW: 1.4, eyeH: 1.4,
-                pupil: 0.3,
+            return RoboEyesParams(
+                eyeW: 78, eyeH: 72, borderRadius: 32, spaceBetween: 16,
                 mouthType: .block, mouthW: 1.1
             )
 
         case .thinking:
-            return ExpressionParams(
-                eyeW: 0.85, eyeH: 0.85,
-                pupilR: true,
+            return RoboEyesParams(
+                eyeW: 62, eyeH: 48, borderRadius: 16, spaceBetween: 14,
+                leftAngry: 0.15, rightAngry: 0.15,
                 mouthType: .smirk, mouthW: 0.7
             )
 
         case .listening:
-            return ExpressionParams(
-                eyeW: 1.15, eyeH: 1.15,
+            return RoboEyesParams(
+                eyeW: 74, eyeH: 62, borderRadius: 26, spaceBetween: 18,
                 mouthType: .smile, mouthW: 0.5
             )
 
         case .speaking:
-            return ExpressionParams(
+            return RoboEyesParams(
                 mouthType: .open, mouthW: 1.0
             )
 
         case .sleepy:
-            return ExpressionParams(
-                eyeType: .lines, eyeW: 0.25, eyeH: 0.25,
+            return RoboEyesParams(
+                eyeW: 68, eyeH: 28, borderRadius: 12, spaceBetween: 24,
+                leftTired: 0.65, rightTired: 0.65,
+                yOffset: 6,
                 mouthType: .open, mouthW: 0.4
             )
 
         case .wink:
-            return ExpressionParams(
-                mouthType: .smile, mouthW: 1.0,
-                cheek: 0.3
+            return RoboEyesParams(
+                leftHappy: 0.3, rightHappy: 0,
+                leftHeightMul: 1.0, rightHeightMul: 0.08,
+                mouthType: .smile, mouthW: 1.0
             )
 
         case .love:
-            return ExpressionParams(
-                eyeW: 0.75, eyeH: 0.75,
-                mouthType: .kiss, mouthW: 0.9,
-                cheek: 1.0
+            return RoboEyesParams(
+                eyeW: 56, eyeH: 56, borderRadius: 28, spaceBetween: 24,
+                leftHappy: 0.55, rightHappy: 0.55,
+                mouthType: .kiss, mouthW: 0.9
             )
 
         case .confused:
-            return ExpressionParams(
-                pupilL: true,
+            return RoboEyesParams(
+                leftHeightMul: 1.0, rightHeightMul: 0.65,
+                yOffset: -8,
                 mouthType: .sad, mouthW: 0.6
             )
 
         case .cool:
-            return ExpressionParams(
-                eyeW: 0.95, eyeH: 0.95,
+            return RoboEyesParams(
+                eyeW: 66, eyeH: 52, borderRadius: 22, spaceBetween: 22,
+                leftHappy: 0.2, rightHappy: 0.2,
+                yOffset: -6,
                 mouthType: .smirk, mouthW: 1.0
             )
 
         case .shy:
-            return ExpressionParams(
-                eyeW: 0.8, eyeH: 0.8,
-                pupilR: true,
-                mouthType: .smile, mouthW: 0.7,
-                cheek: 0.9
+            return RoboEyesParams(
+                eyeW: 56, eyeH: 56, borderRadius: 26, spaceBetween: 24,
+                leftHappy: 0.4, rightHappy: 0.4,
+                mouthType: .smile, mouthW: 0.7
             )
 
         case .excited:
-            return ExpressionParams(
-                eyeType: .big, eyeW: 1.3, eyeH: 1.3,
-                pupil: 0.4,
-                mouthType: .bigSmile, mouthW: 1.5,
-                cheek: 0.7
+            return RoboEyesParams(
+                eyeW: 76, eyeH: 68, borderRadius: 30, spaceBetween: 16,
+                leftHappy: 0.35, rightHappy: 0.35,
+                mouthType: .bigSmile, mouthW: 1.5
+            )
+
+        case .scared:
+            return RoboEyesParams(
+                eyeW: 52, eyeH: 46, borderRadius: 18, spaceBetween: 36,
+                yOffset: -2,
+                mouthType: .block, mouthW: 0.8
+            )
+
+        case .bored:
+            return RoboEyesParams(
+                eyeW: 70, eyeH: 44, borderRadius: 12, spaceBetween: 24,
+                leftFlat: 0.35, rightFlat: 0.35,
+                yOffset: 2,
+                mouthType: .line, mouthW: 1.2
+            )
+
+        case .focused:
+            return RoboEyesParams(
+                eyeW: 62, eyeH: 48, borderRadius: 16, spaceBetween: 14,
+                leftAngry: 0.15, rightAngry: 0.15,
+                mouthType: .line, mouthW: 0.6
+            )
+
+        case .suspicious:
+            return RoboEyesParams(
+                eyeW: 68, eyeH: 56, borderRadius: 20, spaceBetween: 20,
+                leftAngry: 0.45, rightAngry: 0,
+                rightHeightMul: 0.85,
+                mouthType: .smirk, mouthW: 0.8
             )
         }
     }

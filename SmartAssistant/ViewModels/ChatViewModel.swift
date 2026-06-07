@@ -225,52 +225,73 @@ class ChatViewModel: ObservableObject {
         let t = text.lowercased()
         
         // 大笑/非常开心
-        if t.contains("哈哈") || t.contains("笑死") || t.contains("🤣") || t.contains("hhh") {
+        if t.contains("哈哈") || t.contains("笑死") || t.contains("🤣") || t.contains("hhh") || t.contains("太好笑") {
             return .veryHappy
         }
         // 开心
         if t.contains("开心") || t.contains("太棒") || t.contains("真好") ||
-           t.contains("😄") || t.contains("嘿嘿") || t.contains("耶") {
+           t.contains("😄") || t.contains("嘿嘿") || t.contains("耶") || t.contains("太好了") {
             return .happy
         }
-        // 兴奋/惊喜
-        if t.contains("哇") || t.contains("天啊") || t.contains("太酷") ||
-           t.contains("🤩") || t.contains("厉害") || t.contains("牛") {
+        // 兴奋
+        if t.contains("哇") || t.contains("🤩") || t.contains("厉害") || t.contains("牛") ||
+           t.contains("太酷") || t.contains("天啊") || t.contains("太强") || t.contains("绝了") {
             return .excited
         }
         // 惊讶
         if t.contains("什么") || t.contains("真的假的") || t.contains("😲") ||
-           t.contains("不会吧") || t.contains("居然") {
+           t.contains("不会吧") || t.contains("居然") || t.contains("我的天") ||
+           t.contains("难以置信") {
             return .surprised
+        }
+        // 害怕
+        if t.contains("害怕") || t.contains("恐怖") || t.contains("😨") ||
+           t.contains("吓") || t.contains("可怕") || t.contains("好怕") {
+            return .scared
         }
         // 生气
         if t.contains("生气") || t.contains("烦") || t.contains("😠") ||
-           t.contains("讨厌") || t.contains("滚") {
+           t.contains("讨厌") || t.contains("滚") || t.contains("无语") || t.contains("愤怒") {
             return .angry
         }
         // 难过
         if t.contains("难过") || t.contains("伤心") || t.contains("😢") ||
-           t.contains("哭") || t.contains("可惜") || t.contains("遗憾") {
+           t.contains("哭") || t.contains("可惜") || t.contains("遗憾") || t.contains("心痛") {
             return .sad
+        }
+        // 无聊
+        if t.contains("无聊") || t.contains("😑") || t.contains("没意思") ||
+           t.contains("好闲") || t.contains("闷") {
+            return .bored
         }
         // 喜欢/爱
         if t.contains("爱你") || t.contains("喜欢") || t.contains("🥰") ||
-           t.contains("亲亲") || t.contains("么么") {
+           t.contains("亲亲") || t.contains("么么") || t.contains("爱你哟") {
             return .love
         }
         // 害羞
         if t.contains("害羞") || t.contains("😳") || t.contains("不好意思") ||
-           t.contains("脸红") {
+           t.contains("脸红") || t.contains("羞") {
             return .shy
         }
         // 困惑
-        if t.contains("嗯") || t.contains("🤔") || t.contains("不太确定") ||
-           t.contains("奇怪") || t.contains("搞不懂") {
+        if t.contains("🤔") || t.contains("不太确定") || t.contains("奇怪") ||
+           t.contains("搞不懂") || t.contains("？？") || t.contains("不明白") {
             return .confused
+        }
+        // 怀疑
+        if t.contains("🤨") || t.contains("骗人") || t.contains("真的吗") ||
+           t.contains("不信") || t.contains("怀疑") {
+            return .suspicious
+        }
+        // 专注（思考类内容）
+        if t.contains("专注") || t.contains("分析") || t.contains("计算") ||
+           t.contains("查一下") || t.contains("搜索") {
+            return .focused
         }
         // 眨眼/俏皮
         if t.contains("😉") || t.contains("悄悄") || t.contains("秘密") ||
-           t.contains("嘿") {
+           t.contains("嘿") || t.contains("嘘") {
             return .wink
         }
         // 酷
@@ -278,7 +299,7 @@ class ChatViewModel: ObservableObject {
             return .cool
         }
         // 困
-        if t.contains("😴") || t.contains("困") || t.contains("累了") {
+        if t.contains("😴") || t.contains("困") || t.contains("累了") || t.contains("好累") {
             return .sleepy
         }
         
