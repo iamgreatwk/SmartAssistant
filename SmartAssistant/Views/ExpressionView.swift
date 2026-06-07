@@ -9,16 +9,11 @@ struct ExpressionView: View {
     var size: CGFloat? = nil
     let isFullscreen: Bool
 
-    /// 视线偏移（-1~1，-1=左/上，0=中心，+1=右/下）
     var lookX: CGFloat = 0
     var lookY: CGFloat = 0
 
     @State private var displayDate = Date()
     @State private var displayParams: ExpressionType.RoboEyesParams
-    @State private var blinking = false
-    @State private var blinkTimer = 0
-    @State private var savedLeftH: CGFloat = 1
-    @State private var savedRightH: CGFloat = 1
     @State private var smoothLookX: CGFloat = 0
     @State private var smoothLookY: CGFloat = 0
 
@@ -77,8 +72,12 @@ struct ExpressionView: View {
                 let br = currentBR * eyeScale
                 let sb = currentSB * eyeScale
 
-                let leftH = blinking ? ew * 0.08 : eh * lhMul
-                let rightH = blinking ? ew * 0.08 : eh * rhMul
+                // 眨眼：直接从时间计算
+                let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
+                let isBlinking = blinkPhase < 0.15
+
+                let leftH = isBlinking ? ew * 0.08 : eh * lhMul
+                let rightH = isBlinking ? ew * 0.08 : eh * rhMul
 
                 let lookOffsetX = smoothLookX * 8 * scale
                 let lookOffsetY = smoothLookY * 6 * scale
@@ -128,29 +127,13 @@ struct ExpressionView: View {
             displayParams.leftFlat = lerp(displayParams.leftFlat, ep.leftFlat)
             displayParams.rightFlat = lerp(displayParams.rightFlat, ep.rightFlat)
             displayParams.yOffset = lerp(displayParams.yOffset, ep.yOffset)
-
-            // 高度倍率——眨眼时不 lerp，防止眨眼被抹平
-            if !blinking {
-                displayParams.leftHeightMul = lerp(displayParams.leftHeightMul, ep.leftHeightMul)
-                displayParams.rightHeightMul = lerp(displayParams.rightHeightMul, ep.rightHeightMul)
-            }
+            displayParams.leftHeightMul = lerp(displayParams.leftHeightMul, ep.leftHeightMul)
+            displayParams.rightHeightMul = lerp(displayParams.rightHeightMul, ep.rightHeightMul)
 
             // 视线平滑过渡
             let lerpF = { (a: CGFloat, b: CGFloat) -> CGFloat in a + (b - a) * 0.12 }
             smoothLookX = lerpF(smoothLookX, lookX)
             smoothLookY = lerpF(smoothLookY, lookY)
-
-            // 自动眨眼 — 每 3.5 秒眨一次，持续 0.15 秒
-            let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
-            if blinkPhase < 0.15 {
-                blinking = true
-                displayParams.leftHeightMul = 0.08
-                displayParams.rightHeightMul = 0.08
-            } else if blinking {
-                blinking = false
-                displayParams.leftHeightMul = ep.leftHeightMul
-                displayParams.rightHeightMul = ep.rightHeightMul
-            }
 
             displayDate = Date()
         }
