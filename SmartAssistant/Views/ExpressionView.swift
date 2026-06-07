@@ -34,9 +34,6 @@ struct ExpressionView: View {
             let t = displayDate.timeIntervalSinceReferenceDate
             let floatOffset = sin(t * 1.5) * 1.5 * scale
             let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
-            let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
-            let autoBlink = blinkPhase < 0.15
-
             Canvas { context, size in
                 var ctx = context
 
@@ -162,7 +159,7 @@ struct ExpressionView: View {
         if flat > 0.05 {
             let fh = h * flat
             let flatRect = CGRect(x: x - 1, y: y - 1, width: w + 2, height: fh + 1)
-            ctx.fill(Path(rect: flatRect), with: bgColor)
+            ctx.fill(Path(flatRect), with: bgColor)
         }
 
         // 3. 疲惫眼皮（外→内三角）
