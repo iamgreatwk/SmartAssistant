@@ -69,6 +69,9 @@
 	<!-- 相册读取 -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>小智助手需要访问相册来分析和处理图片</string>
+	<!-- 相册写入 -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>小智助手需要保存照片到相册</string>
 	<!-- 网络访问 -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

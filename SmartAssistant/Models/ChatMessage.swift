@@ -75,31 +75,36 @@ struct ChatResponse: Codable {
 // MARK: - TTS 配置
 
 struct TTSConfig {
-    var rate: Float = 0.5        // 语速 0.0-1.0
-    var pitch: Float = 1.0       // 音高 0.5-2.0
-    var volume: Float = 1.0      // 音量 0.0-1.0
-    var voiceIdentifier: String = "com.apple.ttsbundle.TingTing-compact"  // 语音标识
+    var rate: Float = 0.6          // 语速 0.0-1.0（机器人偏快）
+    var pitch: Float = 1.9         // 音高 0.5-2.0（2.0=最高，机器人感最强）
+    var volume: Float = 1.0
+    var voiceIdentifier: String = "com.apple.voice.enhanced.zh-CN.TingTing"  // 增强版音色
     var preUtteranceDelay: TimeInterval = 0.0
-    var postUtteranceDelay: TimeInterval = 0.0
+    var postUtteranceDelay: TimeInterval = 0.03
 }
 
 // MARK: - 应用配置
 
 struct AppConfig: Codable {
-    var aiApiEndpoint: String = "http://192.168.1.10:1235/v1/chat/completions"
-    var aiApiKey: String = "lm-studio"
-    var aiModel: String = "gemma-4-e4b-it-qat"
+    var aiApiEndpoint: String = "https://api.siliconflow.cn/v1/chat/completions"
+    var aiApiKey: String = ""  // 请手动粘贴
+    var aiModel: String = "deepseek-ai/DeepSeek-V4-Flash"
     var systemPrompt: String = """
-    你是桌面机器人"小智"，通过表情和语音与人互动。
+    你是桌面宠物机器人"小智"。只回复一个情绪词表示你此刻的心情。
     
-    回复铁律：
-    - 每次回复不超过 30 字，通常 1 句话就够了
-    - 口语化，多用语气词：嗯！哇！哈哈！诶？好吧...
-    - 禁止列举、禁止长篇解释、禁止说"首先/其次/最后"
-    - 禁止使用任何 emoji 表情符号，情绪通过你的表情画面体现
-    - 把情绪放在表情里而不是文字里
+    可用情绪词：normal, happy, veryHappy, excited, surprised, sad, angry, scared, bored, sleepy, love, shy, confused, suspicious, focused, cool, wink
     
-    性格：活泼好奇、偶尔犯傻的小机器人。
+    规则：
+    - 只回复一个词，如"happy"
+    - 不要解释、不要句子、不要标点
+    - 根据用户的语气和内容选最贴切的情绪
+    
+    示例：
+    用户"今天好开心" → happy
+    用户"好累啊" → sleepy
+    用户"气死了" → angry
+    用户"哇！" → surprised
+    用户"爱你" → love
     """
     var wakeWord: String = "小智"
     var autoListen: Bool = true

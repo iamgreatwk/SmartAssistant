@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import AudioToolbox
 
 /// 聊天 ViewModel — 协调语音对话流程 + 表情动画序列
 @MainActor
@@ -19,12 +20,24 @@ class ChatViewModel: ObservableObject {
     @Published var showSettings: Bool = false
     @Published var ttsConfig = TTSConfig()
     
+    // 摄像头/照片
+    @Published var cameraActive = false
+    @Published var capturedPhoto: UIImage?
+    
     // 视线方向（-1~1，-1=左/上，0=中心，+1=右/下）
     @Published var lookX: CGFloat = 0
     @Published var lookY: CGFloat = 0
     
     // 对话状态
     @Published var conversationState: ConversationState = .idle
+    
+    // 情绪感知
+    @Published var userMood: ExpressionType = .normal
+    private var recentMoods: [ExpressionType] = []
+    
+    // 摇晃检测
+    private var lastAccel: Double = 1.0
+    private var isDizzy = false
     
     enum ConversationState: Equatable {
         case idle
@@ -170,6 +183,14 @@ class ChatViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] level in self?.speakingLevel = CGFloat(level) }
             .store(in: &cancellables)
+        
+        // 摇晃检测：加速度突变 → 头晕
+        motionService.$accelerometerData
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] data in
+                self?.detectShake(data)
+            }
+            .store(in: &cancellables)
         $ttsConfig
             .sink { [weak self] config in self?.speaker.updateConfig(config) }
             .store(in: &cancellables)
@@ -279,20 +300,41 @@ class ChatViewModel: ObservableObject {
         }
     }
     
+    // 指令检测关键词
+    static let commands: [String: (ExpressionType, String)] = [
+        "拍照": (.excited, "camera"),
+        "相机": (.excited, "camera"),
+        "拍张照": (.excited, "camera"),
+        "咔嚓": (.excited, "camera"),
+        "天气": (.focused, "weather"),
+        "气温": (.focused, "weather"),
+        "多少度": (.focused, "weather"),
+        "搜索": (.focused, "search"),
+        "查一下": (.focused, "search"),
+        "帮我查": (.focused, "search"),
+    ]
+
+    private func detectCommand(_ text: String) -> (ExpressionType, String)? {
+        let t = text.lowercased()
+        for (keyword, (expr, cmd)) in Self.commands {
+            if t.contains(keyword) { return (expr, cmd) }
+        }
+        return nil
+    }
+    
     // MARK: - 语音交互
     
     func startListening() {
         guard !isListening, !isSpeaking else { return }
         stopSequence()
+        stopSpeakingCycle()
         do {
             try speechRecognition.startRecognition()
             isListening = true
             conversationState = .listening
             currentExpression = .listening
             lookX = 0; lookY = -0.2
-        } catch {
-            print("语音识别启动失败: \(error.localizedDescription)")
-        }
+        } catch {}
     }
     
     func stopListening() {
@@ -308,34 +350,49 @@ class ChatViewModel: ObservableObject {
         speechRecognition.stopRecognition()
         isListening = false
         
-        let userMessage = ChatMessage(role: .user, content: trimmed, expression: .normal)
-        messages.append(userMessage)
+        // 感知用户情绪
+        let detectedMood = detectEmotion(trimmed)
+        userMood = detectedMood
+        recentMoods.append(detectedMood)
+        if recentMoods.count > 10 { recentMoods.removeFirst() }
+        
+        messages.append(ChatMessage(role: .user, content: trimmed))
         conversationState = .thinking
         currentExpression = .thinking
         lookX = 0; lookY = -0.3
         
-        let sensorContext = collectSensorContext()
+        // 指令检测
+        if let (expr, cmd) = detectCommand(trimmed) {
+            isProcessing = false
+            playSound(cmd)
+            if cmd == "camera" {
+                cameraActive = true
+            } else {
+                currentExpression = expr
+                playSequence("excited")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                    self?.conversationState = .idle
+                    self?.currentExpression = .normal
+                }
+            }
+            return
+        }
         
+        // 普通对话
+        let sensorContext = collectSensorContext()
         do {
             let response = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
-            
-            let emotion = detectEmotion(response)
-            let aiMessage = ChatMessage(role: .assistant, content: response, expression: emotion)
-            messages.append(aiMessage)
-            
-            speakResponse(response, emotion: emotion)
+            let aiEmotion = parseEmotion(response)
+            messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
+            respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
             currentExpression = .sad; lookX = 0; lookY = 0.2
-            // 播放错误序列
             if !isPlayingSequence { playSequence("error") }
-            
-            let errorMsg = ChatMessage(role: .assistant,
-                                       content: "抱歉，我暂时无法回应: \(error.localizedDescription)",
-                                       expression: .sad)
-            messages.append(errorMsg)
+            playSound("error")
+            messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
         }
     }
     
@@ -346,70 +403,149 @@ class ChatViewModel: ObservableObject {
         guard !trimmed.isEmpty else { return }
         currentInput = ""
         
-        let userMessage = ChatMessage(role: .user, content: trimmed)
-        messages.append(userMessage)
+        let detectedMood = detectEmotion(trimmed)
+        userMood = detectedMood
+        recentMoods.append(detectedMood)
+        if recentMoods.count > 10 { recentMoods.removeFirst() }
+        
+        messages.append(ChatMessage(role: .user, content: trimmed))
         isProcessing = true
         conversationState = .thinking
         currentExpression = .thinking; lookX = 0; lookY = -0.3
         
-        let sensorContext = collectSensorContext()
+        if let (expr, cmd) = detectCommand(trimmed) {
+            isProcessing = false
+            playSound(cmd)
+            if cmd == "camera" { cameraActive = true; return }
+            currentExpression = expr
+            playSequence("excited")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.conversationState = .idle; self?.currentExpression = .normal
+            }
+            return
+        }
         
+        let sensorContext = collectSensorContext()
         do {
             let response = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
-            let emotion = detectEmotion(response)
-            let aiMessage = ChatMessage(role: .assistant, content: response, expression: emotion)
-            messages.append(aiMessage)
-            speakResponse(response, emotion: emotion)
+            let aiEmotion = parseEmotion(response)
+            messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
+            respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
             currentExpression = .sad; lookX = 0; lookY = 0.2
             if !isPlayingSequence { playSequence("error") }
-            let errorMsg = ChatMessage(role: .assistant,
-                                       content: "出了点问题: \(error.localizedDescription)",
-                                       expression: .sad)
-            messages.append(errorMsg)
+            playSound("error")
+            messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
         }
     }
     
-    // MARK: - TTS 播报
+    // MARK: - 宠物回应（感知情绪 + AI 推理 → 表情）
     
-    private func speakResponse(_ text: String, emotion: ExpressionType? = nil) {
-        let emo = emotion ?? detectEmotion(text)
+    /// 情绪互补映射：用户难过 → 宠物安慰，用户开心 → 宠物更开心
+    static let petEmpathy: [ExpressionType: ExpressionType] = [
+        .sad: .sad,         // 你难过，我也难过
+        .angry: .scared,    // 你生气，我害怕
+        .scared: .scared,   // 你害怕，我陪你害怕
+        .happy: .happy,     // 你开心，我也开心
+        .excited: .excited, // 你兴奋，我更兴奋
+        .love: .love,       // 你喜欢我，我也喜欢你
+        .bored: .curious,   // 你无聊，我来逗你（用curious代替）
+        .sleepy: .sleepy,   // 你困了，我也困
+        .confused: .confused,
+        .suspicious: .suspicious,
+    ]
+    
+    private func respondLikePet(userMood: ExpressionType, aiEmotion: ExpressionType) {
         conversationState = .speaking
         stopSequence()
         
-        // 强情绪先播放动画序列
-        if let seqName = Self.emotionToSequence[emo], !isPlayingSequence {
+        // 根据用户情绪选回应方式
+        let empathy = Self.petEmpathy[userMood]
+        let finalExpr = empathy ?? aiEmotion
+        playSound(finalExpr.rawValue)
+        
+        // 长时间情绪低落 → 主动安慰
+        if isUserSad() {
+            playSequence("curious")  // 好奇探索 → 试图逗你
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
+                self?.currentExpression = .happy
+                self?.startSpeakingCycle(.happy)
+            }
+        } else if let seqName = Self.emotionToSequence[finalExpr] {
             playSequence(seqName)
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
                 guard self?.conversationState == .speaking else { return }
-                self?.currentExpression = emo
+                self?.currentExpression = finalExpr
                 self?.lookX = 0; self?.lookY = 0
-                self?.startSpeakingCycle(emo)  // 序列结束后开始循环
+                self?.startSpeakingCycle(finalExpr)
             }
         } else {
-            currentExpression = emo
+            currentExpression = finalExpr
             lookX = 0; lookY = 0
-            startSpeakingCycle(emo)  // 直接开始循环
+            startSpeakingCycle(finalExpr)
         }
         
-        let cleaned = text.filter { !$0.isEmoji }
-        speaker.speak(cleaned.trimmingCharacters(in: .whitespaces)) { [weak self] in
-            DispatchQueue.main.async {
-                self?.stopSpeakingCycle()
-                self?.stopSequence()
-                self?.conversationState = .idle
-                self?.currentExpression = .normal
-                self?.lookX = 0; self?.lookY = 0
-                self?.isSpeaking = false
-                if self?.config.autoListen == true {
-                    self?.startListening()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            guard self?.conversationState == .speaking else { return }
+            self?.stopSpeakingCycle()
+            self?.conversationState = .idle
+            self?.currentExpression = .normal
+            self?.lookX = 0; self?.lookY = 0
+            if self?.config.autoListen == true { self?.startListening() }
+        }
+    }
+    
+    /// 最近 5 条情绪中有超过一半是负面情绪
+    private func isUserSad() -> Bool {
+        let recent = recentMoods.suffix(5)
+        let negative: Set<ExpressionType> = [.sad, .angry, .scared, .bored, .sleepy, .confused]
+        let negCount = recent.filter { negative.contains($0) }.count
+        return negCount >= 3
+    }
+    
+    // MARK: - 摇晃感知
+    
+    private func detectShake(_ data: AccelerometerData?) {
+        guard let data = data, conversationState != .error else { return }
+        let mag = data.magnitude
+        let delta = abs(mag - lastAccel)
+        lastAccel = mag
+        
+        // 加速度突变 >2.5G → 触发眩晕
+        if delta > 2.5 && !isDizzy {
+            isDizzy = true
+            currentExpression = .confused
+            playSound("dizzy")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.isDizzy = false
+                if self?.conversationState == .idle {
+                    self?.currentExpression = .normal
                 }
             }
         }
-        isSpeaking = true
+    }
+    
+    // MARK: - 声音效果
+    
+    func playSound(_ name: String) {
+        switch name {
+        case "camera":     AudioServicesPlaySystemSound(1108)  // 快门声
+        case "weather":    AudioServicesPlaySystemSound(1002)  // 提示音
+        case "search":     AudioServicesPlaySystemSound(1004)  // 搜索音
+        case "error":      AudioServicesPlaySystemSound(1053)  // 错误音
+        case "happy":      AudioServicesPlaySystemSound(1025)  // 欢快音
+        case "excited":    AudioServicesPlaySystemSound(1024)  // 惊喜音
+        case "surprised":  AudioServicesPlaySystemSound(1026)  // 惊讶音
+        case "dizzy":      AudioServicesPlaySystemSound(1052)  // 眩晕滴滴声
+        case "sad":        AudioServicesPlaySystemSound(1006)  // 低沉音
+        case "angry":      AudioServicesPlaySystemSound(1054)  // 警报音
+        case "love":       AudioServicesPlaySystemSound(1020)  // 温柔音
+        case "veryHappy":  AudioServicesPlaySystemSound(1031)  // 大笑音
+        default: break
+        }
     }
     
     // MARK: - 说话期间表情循环
@@ -438,10 +574,8 @@ class ChatViewModel: ObservableObject {
     }
     
     func stopSpeaking() {
-        speaker.stopSpeaking()
         stopSequence()
         stopSpeakingCycle()
-        isSpeaking = false
         conversationState = .idle
         currentExpression = .normal
         lookX = 0; lookY = 0
