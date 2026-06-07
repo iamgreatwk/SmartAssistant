@@ -7,7 +7,6 @@ struct ContentView: View {
     @StateObject private var sensorVM = SensorViewModel()
     @StateObject private var permissionManager = PermissionManager()
     
-    @State private var deviceRotation: Double = 0
     @State private var showSettings: Bool = false
     @State private var settingsOffset: CGFloat = -UIScreen.main.bounds.width
     @State private var hasAutoStarted = false
@@ -25,8 +24,6 @@ struct ContentView: View {
                     lookX: chatVM.lookX,
                     lookY: chatVM.lookY
                 )
-                .rotationEffect(.degrees(deviceRotation))
-                .animation(.easeInOut(duration: 0.3), value: deviceRotation)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onTapGesture {
                     handleTap()
@@ -58,17 +55,6 @@ struct ContentView: View {
                 
                 // 左边缘拖拽手势
                 leftEdgeDragZone(width: geo.size.width)
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-            let orient = UIDevice.current.orientation
-            withAnimation(.easeInOut(duration: 0.3)) {
-                switch orient {
-                case .landscapeLeft:  deviceRotation = -90
-                case .landscapeRight: deviceRotation = 90
-                case .portraitUpsideDown: deviceRotation = 180
-                default: deviceRotation = 0
-                }
             }
         }
         .onAppear {

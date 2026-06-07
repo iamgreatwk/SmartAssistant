@@ -39,16 +39,15 @@ struct ExpressionView: View {
             let scale = s / 100
             let t = displayDate.timeIntervalSinceReferenceDate
             let floatOffset = sin(t * 1.5) * 1.5 * scale
-            let headTilt = sin(t * 0.8) * 0.8 * .pi / 180
             Canvas { context, size in
                 var ctx = context
 
-                ctx.translateBy(x: size.width / 2, y: size.height / 2)
-                ctx.rotate(by: Angle(radians: headTilt))
-                ctx.translateBy(x: -s / 2, y: -s / 2 + floatOffset)
+                // 居中绘制，不旋转（横竖屏自适应）
+                ctx.translateBy(x: size.width / 2, y: size.height / 2 + floatOffset)
 
                 // 背景
-                ctx.fill(Path(CGRect(x: 0, y: 0, width: s, height: s)), with: .color(.black))
+                let sx = min(size.width, size.height)
+                ctx.fill(Path(CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)), with: .color(.black))
 
                 let ep = expression.roboParams
                 let dp = displayParams
@@ -73,39 +72,42 @@ struct ExpressionView: View {
                 let rhMul = lerp(dp.rightHeightMul, ep.rightHeightMul)
                 let yOff = lerp(dp.yOffset, ep.yOffset)
 
-                // 眼尺寸映射到视图坐标
+                // 眼尺寸映射
                 let eyeScale = scale * 0.25
                 let ew = currentW * eyeScale
                 let eh = currentH * eyeScale
                 let br = currentBR * eyeScale
                 let sb = currentSB * eyeScale
 
-                // 左眼高度
+                // 眼睛高度（眨眼时压缩）
                 let leftH = blinking ? ew * 0.08 : eh * lhMul
                 let rightH = blinking ? ew * 0.08 : eh * rhMul
 
-                let leftY = 36 * scale - leftH / 2 + yOff * scale
-                let rightY = 36 * scale - rightH / 2 + yOff * scale
+                // 视线偏移
+                let lookOffsetX = smoothLookX * 8 * scale
+                let lookOffsetY = smoothLookY * 6 * scale
 
-                // 居中计算左眼 X，加上视线偏移
-                let lookOffsetX = smoothLookX * 8 * scale  // 视线水平偏移
-                let lookOffsetY = smoothLookY * 6 * scale  // 视线垂直偏移
+                // 垂直居中：100单位坐标系中眼中心在 y=36，原点在屏幕中心
+                let eyeCY = (36 - 50) * scale + yOff * scale + lookOffsetY
+
+                let leftY = eyeCY - leftH / 2
+                let rightY = eyeCY - rightH / 2
+
+                // 水平居中
                 let totalW = ew * 2 + sb
-                let leftX = (50 * scale) - totalW / 2 + lookOffsetX
+                let leftX = -totalW / 2 + lookOffsetX
                 let rightX = leftX + ew + sb
-                let lyAdjusted = leftY + lookOffsetY
-                let ryAdjusted = rightY + lookOffsetY
 
                 let bgColor = GraphicsContext.Shading.color(.black)
                 let mainColor = GraphicsContext.Shading.color(Color(red: 0.49, green: 0.99, blue: 0)) // #7cfc00 绿色
 
                 // 绘制左眼
-                drawRoboEye(ctx: ctx, x: leftX, y: lyAdjusted, w: ew, h: leftH, br: br,
+                drawRoboEye(ctx: ctx, x: leftX, y: leftY, w: ew, h: leftH, br: br,
                             tired: lTired, angry: lAngry, happy: lHappy, flat: lFlat,
                             isLeft: true, mainColor: mainColor, bgColor: bgColor)
 
                 // 绘制右眼
-                drawRoboEye(ctx: ctx, x: rightX, y: ryAdjusted, w: ew, h: rightH, br: br,
+                drawRoboEye(ctx: ctx, x: rightX, y: rightY, w: ew, h: rightH, br: br,
                             tired: rTired, angry: rAngry, happy: rHappy, flat: rFlat,
                             isLeft: false, mainColor: mainColor, bgColor: bgColor)
 
@@ -131,22 +133,26 @@ struct ExpressionView: View {
             displayParams.rightHappy = lerp(displayParams.rightHappy, ep.rightHappy)
             displayParams.leftFlat = lerp(displayParams.leftFlat, ep.leftFlat)
             displayParams.rightFlat = lerp(displayParams.rightFlat, ep.rightFlat)
-            displayParams.leftHeightMul = lerp(displayParams.leftHeightMul, ep.leftHeightMul)
-            displayParams.rightHeightMul = lerp(displayParams.rightHeightMul, ep.rightHeightMul)
             displayParams.yOffset = lerp(displayParams.yOffset, ep.yOffset)
+
+            // 高度倍率——眨眼时不 lerp，防止眨眼被抹平
+            if !blinking {
+                displayParams.leftHeightMul = lerp(displayParams.leftHeightMul, ep.leftHeightMul)
+                displayParams.rightHeightMul = lerp(displayParams.rightHeightMul, ep.rightHeightMul)
+            }
 
             // 视线平滑过渡
             let lerpF = { (a: CGFloat, b: CGFloat) -> CGFloat in a + (b - a) * 0.12 }
             smoothLookX = lerpF(smoothLookX, lookX)
             smoothLookY = lerpF(smoothLookY, lookY)
 
-            // 自动眨眼
+            // 自动眨眼 — 每 3.5 秒眨一次，持续 0.15 秒
             let blinkPhase = t.truncatingRemainder(dividingBy: 3.5)
             if blinkPhase < 0.15 {
                 blinking = true
                 displayParams.leftHeightMul = 0.08
                 displayParams.rightHeightMul = 0.08
-            } else if blinking && blinkPhase >= 0.15 {
+            } else if blinking {
                 blinking = false
                 displayParams.leftHeightMul = ep.leftHeightMul
                 displayParams.rightHeightMul = ep.rightHeightMul
