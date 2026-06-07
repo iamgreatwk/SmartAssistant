@@ -442,6 +442,14 @@ class ChatViewModel: ObservableObject {
         }
     }
     
+    /// AI 只输出一个情绪词，直接解析
+    private func parseEmotion(_ text: String) -> ExpressionType {
+        let word = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .punctuationCharacters)
+            .lowercased()
+        return ExpressionType(rawValue: word) ?? detectEmotion(text)
+    }
+    
     // MARK: - 宠物回应（感知情绪 + AI 推理 → 表情）
     
     /// 情绪互补映射：用户难过 → 宠物安慰，用户开心 → 宠物更开心
@@ -452,7 +460,7 @@ class ChatViewModel: ObservableObject {
         .happy: .happy,     // 你开心，我也开心
         .excited: .excited, // 你兴奋，我更兴奋
         .love: .love,       // 你喜欢我，我也喜欢你
-        .bored: .curious,   // 你无聊，我来逗你（用curious代替）
+        .bored: .normal,    // 你无聊，我来逗你
         .sleepy: .sleepy,   // 你困了，我也困
         .confused: .confused,
         .suspicious: .suspicious,
@@ -509,7 +517,8 @@ class ChatViewModel: ObservableObject {
     // MARK: - 摇晃感知
     
     private func detectShake(_ data: AccelerometerData?) {
-        guard let data = data, conversationState != .error else { return }
+        guard let data = data else { return }
+        if case .error = conversationState { return }
         let mag = data.magnitude
         let delta = abs(mag - lastAccel)
         lastAccel = mag
