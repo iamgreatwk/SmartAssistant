@@ -108,6 +108,34 @@ class ChatViewModel: ObservableObject {
     private var sequenceIndex = 0
     private var isPlayingSequence = false
     
+    // 说话期间表情循环
+    private var speakingCycleTimer: AnyCancellable?
+    private var speakingCycle: [ExpressionType] = []
+    private var speakingCycleIndex = 0
+    
+    // 情绪→表情循环簇（说话期间 3s 切换）
+    static let emotionClusters: [ExpressionType: [ExpressionType]] = [
+        .happy:     [.happy, .veryHappy, .happy, .love, .wink, .happy],
+        .veryHappy: [.veryHappy, .happy, .love, .excited, .veryHappy],
+        .excited:   [.excited, .surprised, .happy, .excited, .love, .happy],
+        .surprised: [.surprised, .excited, .surprised, .scared, .surprised],
+        .sad:       [.sad, .sleepy, .sad, .confused, .sad, .normal],
+        .angry:     [.angry, .suspicious, .angry, .scared, .angry],
+        .scared:    [.scared, .surprised, .sad, .scared, .normal],
+        .confused:  [.confused, .thinking, .suspicious, .confused, .thinking],
+        .love:      [.love, .shy, .love, .happy, .love, .wink],
+        .sleepy:    [.sleepy, .sad, .normal, .sleepy],
+        .focused:   [.focused, .thinking, .focused, .cool, .focused],
+        .thinking:  [.thinking, .focused, .thinking, .confused, .thinking],
+        .cool:      [.cool, .normal, .cool, .happy, .cool],
+        .shy:       [.shy, .love, .shy, .happy, .shy],
+        .suspicious:[.suspicious, .confused, .thinking, .suspicious],
+        .bored:     [.bored, .sleepy, .normal, .bored],
+        .wink:      [.wink, .happy, .normal, .wink],
+        .speaking:  [.speaking, .normal, .listening, .thinking, .speaking],
+        .normal:    [.normal, .listening, .thinking, .focused, .normal],
+    ]
+    
     // MARK: - 服务
     
     private let aiService = AIChatService()
@@ -195,22 +223,29 @@ class ChatViewModel: ObservableObject {
     // MARK: - 表情丰富化
     
     private func enrichExpression() {
-        guard !isPlayingSequence else { return }  // 序列播放时不干扰
+        guard !isPlayingSequence else { return }
         
         switch conversationState {
         case .listening:
+            // 聆听：专注/思考/好奇 随机切换
+            let exprs: [ExpressionType] = [.listening, .focused, .listening, .thinking, .listening]
+            let looks: [(CGFloat, CGFloat)] = [(0, -0.2), (0, -0.3), (0.2, -0.15), (-0.2, -0.15)]
             if Int.random(in: 0...2) == 0 {
                 withAnimation(.easeInOut(duration: 0.5)) {
-                    lookX = CGFloat.random(in: -0.3...0.3)
-                    lookY = CGFloat.random(in: -0.15...0.15)
+                    currentExpression = exprs.randomElement() ?? .listening
+                    let l = looks.randomElement()!
+                    lookX = l.0; lookY = l.1
                 }
             }
         case .thinking:
-            let dirs: [(CGFloat, CGFloat)] = [(0, -0.4), (0.3, -0.3), (-0.3, -0.3)]
+            // 思考：思考/专注/困惑/怀疑 循环
+            let exprs: [ExpressionType] = [.thinking, .focused, .confused, .thinking, .suspicious]
+            let looks: [(CGFloat, CGFloat)] = [(0, -0.5), (0.4, -0.4), (-0.4, -0.3), (0, -0.6)]
             if Int.random(in: 0...2) == 0 {
-                let d = dirs.randomElement()!
                 withAnimation(.easeInOut(duration: 0.6)) {
-                    lookX = d.0; lookY = d.1
+                    currentExpression = exprs.randomElement() ?? .thinking
+                    let l = looks.randomElement()!
+                    lookX = l.0; lookY = l.1
                 }
             }
         case .speaking:
@@ -221,13 +256,19 @@ class ChatViewModel: ObservableObject {
                 }
             }
         case .idle:
-            if Int.random(in: 0...5) == 0 {
-                let dirs: [(CGFloat, CGFloat)] = [
-                    (0,0), (0.5,0), (-0.5,0), (0,0.3), (0,-0.3), (0.3,0.2), (-0.3,0.2)
+            // 空闲：10种表情随机 + 扫视
+            if Int.random(in: 0...6) == 0 {
+                let exprs: [ExpressionType] = [
+                    .normal, .cool, .happy, .thinking, .wink,
+                    .focused, .normal, .shy, .listening, .normal
                 ]
-                let d = dirs.randomElement()!
+                let looks: [(CGFloat, CGFloat)] = [
+                    (0,0), (0.5,0), (-0.5,0), (0,0.3), (0,-0.3), (0.3,0.2), (-0.3,0.2), (0,0), (0,-0.1)
+                ]
                 withAnimation(.easeInOut(duration: 0.8)) {
-                    lookX = d.0; lookY = d.1
+                    currentExpression = exprs.randomElement() ?? .normal
+                    let l = looks.randomElement()!
+                    lookX = l.0; lookY = l.1
                 }
             }
         case .error:
@@ -337,24 +378,27 @@ class ChatViewModel: ObservableObject {
     private func speakResponse(_ text: String, emotion: ExpressionType? = nil) {
         let emo = emotion ?? detectEmotion(text)
         conversationState = .speaking
+        stopSequence()
         
-        // 强情绪先播放动画序列，再进入说话状态
+        // 强情绪先播放动画序列
         if let seqName = Self.emotionToSequence[emo], !isPlayingSequence {
             playSequence(seqName)
-            // 序列播完后切换到情绪表情
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
                 guard self?.conversationState == .speaking else { return }
                 self?.currentExpression = emo
                 self?.lookX = 0; self?.lookY = 0
+                self?.startSpeakingCycle(emo)  // 序列结束后开始循环
             }
         } else {
             currentExpression = emo
             lookX = 0; lookY = 0
+            startSpeakingCycle(emo)  // 直接开始循环
         }
         
         let cleaned = text.filter { !$0.isEmoji }
         speaker.speak(cleaned.trimmingCharacters(in: .whitespaces)) { [weak self] in
             DispatchQueue.main.async {
+                self?.stopSpeakingCycle()
                 self?.stopSequence()
                 self?.conversationState = .idle
                 self?.currentExpression = .normal
@@ -368,9 +412,35 @@ class ChatViewModel: ObservableObject {
         isSpeaking = true
     }
     
+    // MARK: - 说话期间表情循环
+    
+    private func startSpeakingCycle(_ baseEmotion: ExpressionType) {
+        let cluster = Self.emotionClusters[baseEmotion] ?? [.speaking, .normal, .speaking]
+        speakingCycle = cluster
+        speakingCycleIndex = 0
+        speakingCycleTimer?.cancel()
+        speakingCycleTimer = Timer.publish(every: 3.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self, self.conversationState == .speaking, !self.speakingCycle.isEmpty else { return }
+                self.speakingCycleIndex = (self.speakingCycleIndex + 1) % self.speakingCycle.count
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    self.currentExpression = self.speakingCycle[self.speakingCycleIndex]
+                }
+            }
+    }
+    
+    private func stopSpeakingCycle() {
+        speakingCycleTimer?.cancel()
+        speakingCycleTimer = nil
+        speakingCycle = []
+        speakingCycleIndex = 0
+    }
+    
     func stopSpeaking() {
         speaker.stopSpeaking()
         stopSequence()
+        stopSpeakingCycle()
         isSpeaking = false
         conversationState = .idle
         currentExpression = .normal

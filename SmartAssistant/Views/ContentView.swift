@@ -17,12 +17,11 @@ struct ContentView: View {
                 // 全屏表情 (始终显示)
                 Color.black.ignoresSafeArea()
                 
-                ExpressionView(
-                    expression: chatVM.currentExpression,
-                    speakingLevel: chatVM.speakingLevel,
-                    isFullscreen: true,
+                ExpressionWebView(
+                    mood: chatVM.currentExpression.rawValue,
                     lookX: chatVM.lookX,
-                    lookY: chatVM.lookY
+                    lookY: chatVM.lookY,
+                    isFullscreen: true
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onTapGesture {
