@@ -7,7 +7,6 @@ import SwiftUI
 struct ExpressionView: View {
     let expression: ExpressionType
     var size: CGFloat? = nil
-    let speakingLevel: CGFloat
     let isFullscreen: Bool
 
     @State private var displayDate = Date()
@@ -22,7 +21,6 @@ struct ExpressionView: View {
     init(expression: ExpressionType, size: CGFloat? = nil, speakingLevel: CGFloat = 0, isFullscreen: Bool = false) {
         self.expression = expression
         self.size = size
-        self.speakingLevel = speakingLevel
         self.isFullscreen = isFullscreen
         self._displayParams = State(initialValue: expression.roboParams)
     }
@@ -99,10 +97,7 @@ struct ExpressionView: View {
                             tired: rTired, angry: rAngry, happy: rHappy, flat: rFlat,
                             isLeft: false, mainColor: mainColor, bgColor: bgColor)
 
-                // 嘴巴（仅说话时绘制，与 HTML RoboEyes 一致）
-                if expression == .speaking {
-                    drawMouth(ctx: ctx, scale: scale, ep: ep, mainColor: mainColor)
-                }
+                // 不画嘴巴，与 HTML RoboEyes 完全一致
             }
         }
         .onReceive(timer) { _ in
@@ -169,12 +164,10 @@ struct ExpressionView: View {
             let th = h * tired
             var triangle = Path()
             if isLeft {
-                // 左眼：左上→右上→左下
                 triangle.move(to: CGPoint(x: x, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x, y: y + th))
             } else {
-                // 右眼：左上→右上→右下
                 triangle.move(to: CGPoint(x: x, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y + th))
@@ -188,12 +181,10 @@ struct ExpressionView: View {
             let ah = h * angry
             var triangle = Path()
             if isLeft {
-                // 左眼：左上→右上→右下
                 triangle.move(to: CGPoint(x: x, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y + ah))
             } else {
-                // 右眼：左上→右上→左下
                 triangle.move(to: CGPoint(x: x, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x + w, y: y - 0.5))
                 triangle.addLine(to: CGPoint(x: x, y: y + ah))
@@ -207,69 +198,6 @@ struct ExpressionView: View {
             let hh = h * happy
             let happyRect = CGRect(x: x - 1, y: y + h - hh + 1, width: w + 2, height: h)
             ctx.fill(Path(roundedRect: happyRect, cornerRadius: br), with: bgColor)
-        }
-    }
-
-    // MARK: - 嘴巴（仅 speaking 时绘制）
-
-    private func drawMouth(ctx: GraphicsContext, scale: CGFloat, ep: ExpressionType.RoboEyesParams, mainColor: GraphicsContext.Shading) {
-        let mw = 8 * ep.mouthW * scale
-        let cx: CGFloat = 50 * scale
-        let cy: CGFloat = 60 * scale
-
-        switch ep.mouthType {
-        case .line:
-            var capsule = Path()
-            capsule.addEllipse(in: CGRect(x: cx - mw * 0.7, y: cy - 0.75 * scale, width: mw * 1.4, height: 1.5 * scale))
-            ctx.fill(capsule, with: mainColor)
-
-        case .smile:
-            var arc = Path()
-            arc.move(to: CGPoint(x: cx - mw, y: cy))
-            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.4))
-            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
-
-        case .bigSmile:
-            var shape = Path()
-            shape.move(to: CGPoint(x: cx - mw, y: cy))
-            shape.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.6))
-            shape.addQuadCurve(to: CGPoint(x: cx - mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.2))
-            shape.closeSubpath()
-            ctx.fill(shape, with: mainColor)
-            var tongue = Path()
-            tongue.addEllipse(in: CGRect(x: cx - mw * 0.2, y: cy + mw * 0.05, width: mw * 0.4, height: mw * 0.3))
-            ctx.fill(tongue, with: .color(Color(red: 0.9, green: 0.35, blue: 0.3)))
-
-        case .open:
-            let lvl = max(0.15, speakingLevel)
-            var ellipse = Path()
-            let mouthH = max(2 * scale, 6 * scale * lvl)
-            ellipse.addEllipse(in: CGRect(x: cx - mw * 0.45, y: cy - mouthH / 2, width: mw * 0.9, height: mouthH))
-            ctx.fill(ellipse, with: mainColor)
-
-        case .sad:
-            var arc = Path()
-            arc.move(to: CGPoint(x: cx - mw, y: cy + mw * 0.3))
-            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy + mw * 0.3), control: CGPoint(x: cx, y: cy - mw * 0.2))
-            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
-
-        case .block:
-            let bs = mw * 0.7
-            var rect = Path()
-            rect.addRoundedRect(in: CGRect(x: cx - bs / 2, y: cy - bs / 2, width: bs, height: bs), cornerSize: CGSize(width: 4 * scale, height: 4 * scale))
-            ctx.fill(rect, with: mainColor)
-
-        case .smirk:
-            var arc = Path()
-            arc.move(to: CGPoint(x: cx - mw * 0.7, y: cy + mw * 0.2))
-            arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy - mw * 0.05), control: CGPoint(x: cx + mw * 0.1, y: cy + mw * 0.5))
-            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
-
-        case .kiss:
-            var circle = Path()
-            let r = mw * 0.35
-            circle.addEllipse(in: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2))
-            ctx.stroke(circle, with: .color(Color(red: 1, green: 0.45, blue: 0.55)), lineWidth: 1.5 * scale)
         }
     }
 }
