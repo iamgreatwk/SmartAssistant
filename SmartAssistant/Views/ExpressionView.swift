@@ -42,11 +42,10 @@ struct ExpressionView: View {
             Canvas { context, size in
                 var ctx = context
 
-                // 居中绘制，不旋转（横竖屏自适应）
+                // 居中绘制，浮动画效果
                 ctx.translateBy(x: size.width / 2, y: size.height / 2 + floatOffset)
 
                 // 背景
-                let sx = min(size.width, size.height)
                 ctx.fill(Path(CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height)), with: .color(.black))
 
                 let ep = expression.roboParams

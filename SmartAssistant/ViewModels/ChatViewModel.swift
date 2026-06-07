@@ -80,9 +80,9 @@ class ChatViewModel: ObservableObject {
             SeqStep(.focused), SeqStep(.normal)
         ],
         "sleepySeq": [
-            SeqStep(.normal), SeqStep(.tired),
+            SeqStep(.normal), SeqStep(.sleepy),
             SeqStep(.sleepy, blink: true), SeqStep(.sleepy, blink: true),
-            SeqStep(.tired)
+            SeqStep(.sleepy)
         ],
         "excited": [
             SeqStep(.surprised, y: -0.5), SeqStep(.happy),
