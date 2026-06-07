@@ -78,8 +78,8 @@ struct ExpressionView: View {
                 let leftH = blinking ? ew * 0.08 : eh * lhMul
                 let rightH = blinking ? ew * 0.08 : eh * rhMul
 
-                let leftY = 38 * scale - leftH / 2 + yOff * scale
-                let rightY = 38 * scale - rightH / 2 + yOff * scale
+                let leftY = 36 * scale - leftH / 2 + yOff * scale
+                let rightY = 36 * scale - rightH / 2 + yOff * scale
 
                 // 居中计算左眼 X
                 let totalW = ew * 2 + sb
@@ -87,7 +87,7 @@ struct ExpressionView: View {
                 let rightX = leftX + ew + sb
 
                 let bgColor = GraphicsContext.Shading.color(.black)
-                let mainColor = GraphicsContext.Shading.color(.white)
+                let mainColor = GraphicsContext.Shading.color(Color(red: 0.49, green: 0.99, blue: 0)) // #7cfc00 绿色
 
                 // 绘制左眼
                 drawRoboEye(ctx: ctx, x: leftX, y: leftY, w: ew, h: leftH, br: br,
@@ -99,8 +99,10 @@ struct ExpressionView: View {
                             tired: rTired, angry: rAngry, happy: rHappy, flat: rFlat,
                             isLeft: false, mainColor: mainColor, bgColor: bgColor)
 
-                // 绘制嘴巴
-                drawMouth(ctx: ctx, scale: scale, ep: ep)
+                // 嘴巴（仅说话时绘制，与 HTML RoboEyes 一致）
+                if expression == .speaking {
+                    drawMouth(ctx: ctx, scale: scale, ep: ep, mainColor: mainColor)
+                }
             }
         }
         .onReceive(timer) { _ in
@@ -208,9 +210,9 @@ struct ExpressionView: View {
         }
     }
 
-    // MARK: - 嘴巴（保持不变）
+    // MARK: - 嘴巴（仅 speaking 时绘制）
 
-    private func drawMouth(ctx: GraphicsContext, scale: CGFloat, ep: ExpressionType.RoboEyesParams) {
+    private func drawMouth(ctx: GraphicsContext, scale: CGFloat, ep: ExpressionType.RoboEyesParams, mainColor: GraphicsContext.Shading) {
         let mw = 8 * ep.mouthW * scale
         let cx: CGFloat = 50 * scale
         let cy: CGFloat = 60 * scale
@@ -219,13 +221,13 @@ struct ExpressionView: View {
         case .line:
             var capsule = Path()
             capsule.addEllipse(in: CGRect(x: cx - mw * 0.7, y: cy - 0.75 * scale, width: mw * 1.4, height: 1.5 * scale))
-            ctx.fill(capsule, with: .color(.white))
+            ctx.fill(capsule, with: mainColor)
 
         case .smile:
             var arc = Path()
             arc.move(to: CGPoint(x: cx - mw, y: cy))
             arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.4))
-            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
+            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
 
         case .bigSmile:
             var shape = Path()
@@ -233,7 +235,7 @@ struct ExpressionView: View {
             shape.addQuadCurve(to: CGPoint(x: cx + mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.6))
             shape.addQuadCurve(to: CGPoint(x: cx - mw, y: cy), control: CGPoint(x: cx, y: cy + mw * 0.2))
             shape.closeSubpath()
-            ctx.fill(shape, with: .color(.white))
+            ctx.fill(shape, with: mainColor)
             var tongue = Path()
             tongue.addEllipse(in: CGRect(x: cx - mw * 0.2, y: cy + mw * 0.05, width: mw * 0.4, height: mw * 0.3))
             ctx.fill(tongue, with: .color(Color(red: 0.9, green: 0.35, blue: 0.3)))
@@ -243,25 +245,25 @@ struct ExpressionView: View {
             var ellipse = Path()
             let mouthH = max(2 * scale, 6 * scale * lvl)
             ellipse.addEllipse(in: CGRect(x: cx - mw * 0.45, y: cy - mouthH / 2, width: mw * 0.9, height: mouthH))
-            ctx.fill(ellipse, with: .color(.white))
+            ctx.fill(ellipse, with: mainColor)
 
         case .sad:
             var arc = Path()
             arc.move(to: CGPoint(x: cx - mw, y: cy + mw * 0.3))
             arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy + mw * 0.3), control: CGPoint(x: cx, y: cy - mw * 0.2))
-            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
+            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
 
         case .block:
             let bs = mw * 0.7
             var rect = Path()
             rect.addRoundedRect(in: CGRect(x: cx - bs / 2, y: cy - bs / 2, width: bs, height: bs), cornerSize: CGSize(width: 4 * scale, height: 4 * scale))
-            ctx.fill(rect, with: .color(.white))
+            ctx.fill(rect, with: mainColor)
 
         case .smirk:
             var arc = Path()
             arc.move(to: CGPoint(x: cx - mw * 0.7, y: cy + mw * 0.2))
             arc.addQuadCurve(to: CGPoint(x: cx + mw, y: cy - mw * 0.05), control: CGPoint(x: cx + mw * 0.1, y: cy + mw * 0.5))
-            ctx.stroke(arc, with: .color(.white), lineWidth: 2 * scale)
+            ctx.stroke(arc, with: mainColor, lineWidth: 2 * scale)
 
         case .kiss:
             var circle = Path()
