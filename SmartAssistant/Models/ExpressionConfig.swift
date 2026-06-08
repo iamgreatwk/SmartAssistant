@@ -185,7 +185,11 @@ struct ExpressionConfig: Codable {
         negativeEmotions: ["sad"],
         shake: ShakeConfig(e: "confused", s: "dizzy"),
         knock: KnockConfig(e: "surprised", s: "happy", lx: 0, ly: -0.4),
+        defaultLooks: nil,
+        lookRanges: nil,
         sensorTriggers: [:],
+        comfort: nil,
+        errorResponse: nil,
         camera: CameraConfig(enabled: true, autoCapture: true, captureDelaySec: 0.8, modes: ["photo"], defaultMode: "photo", commands: [:], faceTriggers: [:])
     )
     
