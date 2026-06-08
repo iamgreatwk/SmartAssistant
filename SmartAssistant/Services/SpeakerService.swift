@@ -1,7 +1,7 @@
 import AVFoundation
 import Combine
 
-/// 扬声器/TTS 服务 — 文字转语音、音频播放
+/// 扬声器/TTS 服务 — 文字转语音
 class SpeakerService: NSObject, ObservableObject {
     
     @Published var isSpeaking = false

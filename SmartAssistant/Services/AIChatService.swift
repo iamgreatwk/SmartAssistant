@@ -118,11 +118,9 @@ class AIChatService: ObservableObject {
     // MARK: - 流式对话
     
     func sendMessageStream(_ text: String, sensorContext: String? = nil, 
-                           onChunk: @escaping (String) -> Void) async throws -> String {
-        // 流式实现需要使用 URLSession 的 bytes/delegate 模式
-        // 这里提供基础实现
+                           onChunk: @escaping (String) -> Void) async throws -> (text: String, tokens: Int) {
         let response = try await sendMessage(text, sensorContext: sensorContext)
-        onChunk(response)
+        onChunk(response.text)
         return response
     }
     

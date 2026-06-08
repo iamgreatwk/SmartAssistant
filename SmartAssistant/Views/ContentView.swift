@@ -19,7 +19,6 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // 全屏表情
                 Color.black.ignoresSafeArea()
                 
                 ExpressionWebView(
@@ -31,7 +30,6 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onTapGesture { handleTap() }
                 
-                // 右上角设置按钮
                 VStack {
                     HStack {
                         Spacer()
@@ -52,9 +50,16 @@ struct ContentView: View {
                     Spacer()
                 }
                 
-                // 设置抽屉
                 settingsDrawer(width: geo.size.width)
                 leftEdgeDragZone(width: geo.size.width)
+                
+                if let photo = chatVM.capturedPhoto {
+                    photoCard(photo: photo, width: geo.size.width, height: geo.size.height)
+                }
+                
+                if chatVM.getConfig().debugMode {
+                    debugOverlay(width: geo.size.width)
+                }
             }
             .onAppear {
                 screenWidth = geo.size.width
@@ -63,17 +68,6 @@ struct ContentView: View {
             .onChange(of: geo.size.width) { _, w in
                 screenWidth = w
                 if !showSettings { settingsOffset = -w }
-            }
-                
-                // 照片预览卡片（右侧显示）
-                if let photo = chatVM.capturedPhoto {
-                    photoCard(photo: photo, width: geo.size.width, height: geo.size.height)
-                }
-                
-                // 调试信息
-                if chatVM.getConfig().debugMode {
-                    debugOverlay(width: geo.size.width)
-                }
             }
         }
         .onAppear {
@@ -89,16 +83,15 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: chatVM.cameraActive) { active in
+        .onChange(of: chatVM.cameraActive) { _, active in
             if active { 
                 cameraService.start()
-                // 等摄像头启动后自动拍照
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     cameraService.capturePhoto()
                 }
             }
         }
-        .onChange(of: cameraService.capturedImage) { img in
+        .onChange(of: cameraService.capturedImage) { _, img in
             guard let img = img, chatVM.cameraActive else { return }
             chatVM.capturedPhoto = img
             chatVM.cameraActive = false
@@ -107,8 +100,6 @@ struct ContentView: View {
             showPhoto()
         }
     }
-    
-    // MARK: - 照片预览卡片
     
     private func photoCard(photo: UIImage, width: CGFloat, height: CGFloat) -> some View {
         let cardW: CGFloat = min(220, width * 0.55)
@@ -123,72 +114,28 @@ struct ContentView: View {
                     .aspectRatio(contentMode: .fill)
                     .frame(width: cardW, height: cardH)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.3), lineWidth: 1))
                     .shadow(color: .black.opacity(0.5), radius: 20)
                     .offset(x: photoOffset)
                     .opacity(photoOpacity)
                     .gesture(
                         DragGesture()
-                            .onChanged { v in
-                                photoOffset = v.translation.width
-                            }
+                            .onChanged { v in photoOffset = v.translation.width }
                             .onEnded { v in
-                                if v.translation.width > 80 {
-                                    // 右滑 → 保存
-                                    savePhoto(photo)
-                                    dismissPhoto()
-                                } else if v.translation.width < -80 {
-                                    // 左滑 → 取消
-                                    dismissPhoto()
-                                } else {
-                                    // 回弹
-                                    withAnimation(.spring()) { photoOffset = 0 }
-                                }
+                                if v.translation.width > 80 { savePhoto(photo); dismissPhoto() }
+                                else if v.translation.width < -80 { dismissPhoto() }
+                                else { withAnimation(.spring()) { photoOffset = 0 } }
                             }
                     )
-                    .overlay(alignment: .top) {
-                        HStack(spacing: 0) {
-                            Text("← 取消")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.6))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.ultraThinMaterial)
-                                .cornerRadius(8)
-                            Spacer()
-                            Text("保存 →")
-                                .font(.caption2)
-                                .foregroundColor(.green.opacity(0.8))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.ultraThinMaterial)
-                                .cornerRadius(8)
-                        }
-                        .padding(8)
-                    }
                 Spacer()
             }
             .padding(.trailing, 12)
         }
     }
     
-    private func showPhoto() {
-        photoOffset = screenWidth
-        photoOpacity = 0
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-            photoOffset = 0
-            photoOpacity = 1
-        }
-    }
-    
+    private func showPhoto() { photoOffset = screenWidth; photoOpacity = 0; withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) { photoOffset = 0; photoOpacity = 1 } }
     private func dismissPhoto() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            photoOffset = screenWidth
-            photoOpacity = 0
-        }
+        withAnimation(.easeInOut(duration: 0.3)) { photoOffset = screenWidth; photoOpacity = 0 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             chatVM.capturedPhoto = nil
             chatVM.conversationState = .idle
@@ -196,24 +143,15 @@ struct ContentView: View {
             if chatVM.getConfig().autoListen { chatVM.startListening() }
         }
     }
-    
     private func savePhoto(_ photo: UIImage) {
         PHPhotoLibrary.requestAuthorization { status in
             if status == .authorized || status == .limited {
                 UIImageWriteToSavedPhotosAlbum(photo, nil, nil, nil)
-                DispatchQueue.main.async {
-                    chatVM.currentExpression = .love
-                    chatVM.playSound("camera")
-                }
+                DispatchQueue.main.async { chatVM.currentExpression = .love; chatVM.playSound("camera") }
             }
         }
-        // 短暂显示爱心后消失
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            dismissPhoto()
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { dismissPhoto() }
     }
-    
-    // MARK: - 调试信息
     
     private func debugOverlay(width: CGFloat) -> some View {
         HStack {
@@ -232,56 +170,41 @@ struct ContentView: View {
             .background(.black.opacity(0.85))
             .cornerRadius(8)
             .padding(.trailing, 8)
-            .frame(maxHeight: .infinity, alignment: .center)
         }
     }
     
-    // MARK: - 交互
-    
-    private func handleTap() {
-        // 暂不响应屏幕点击
-    }
-    
-    // MARK: - 设置抽屉
+    private func handleTap() {}
     
     private func settingsDrawer(width: CGFloat) -> some View {
         HStack(spacing: 0) {
-            SettingsView(chatVM: chatVM, sensorVM: sensorVM)
-                .frame(width: width * 0.85)
-                .background(Color(.systemGroupedBackground))
-            Color.black.opacity(0.01)
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        showSettings = false
-                        settingsOffset = -width
-                    }
-                }
+            SettingsView(chatVM: chatVM, sensorVM: sensorVM).frame(width: width * 0.85).background(Color(.systemGroupedBackground))
+            Color.black.opacity(0.01).onTapGesture {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showSettings = false; settingsOffset = -width }
+            }
         }
         .offset(x: settingsOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { v in if showSettings { settingsOffset = min(0, v.translation.width) } }
-                .onEnded { v in
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        if v.translation.width < -50 { showSettings = false; settingsOffset = -width }
-                        else { settingsOffset = 0 }
-                    }
+        .gesture(DragGesture()
+            .onChanged { v in if showSettings { settingsOffset = min(0, v.translation.width) } }
+            .onEnded { v in
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    if v.translation.width < -50 { showSettings = false; settingsOffset = -width }
+                    else { settingsOffset = 0 }
                 }
+            }
         )
     }
     
     private func leftEdgeDragZone(width: CGFloat) -> some View {
         HStack {
             Color.white.opacity(0.001).frame(width: 30).contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 10)
-                        .onChanged { v in if !showSettings && v.startLocation.x < 30 { settingsOffset = min(0, -width + v.translation.width) } }
-                        .onEnded { v in
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                if v.translation.width > 60 { showSettings = true; settingsOffset = 0 }
-                                else { showSettings = false; settingsOffset = -width }
-                            }
+                .gesture(DragGesture(minimumDistance: 10)
+                    .onChanged { v in if !showSettings && v.startLocation.x < 30 { settingsOffset = min(0, -width + v.translation.width) } }
+                    .onEnded { v in
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            if v.translation.width > 60 { showSettings = true; settingsOffset = 0 }
+                            else { showSettings = false; settingsOffset = -width }
                         }
+                    }
                 )
             Spacer()
         }

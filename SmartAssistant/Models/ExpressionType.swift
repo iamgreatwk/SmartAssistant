@@ -141,10 +141,10 @@ enum ExpressionType: String, CaseIterable, Codable {
             return RoboEyesParams(
                 eyeW: mood.eyeW, eyeH: mood.eyeH,
                 borderRadius: mood.br, spaceBetween: mood.sb,
-                leftTired: mood.lT, rightTired: mood.rT,
-                leftAngry: mood.lA, rightAngry: mood.rA,
-                leftHappy: mood.lH, rightHappy: mood.rH,
-                leftFlat: mood.lF, rightFlat: mood.rF,
+                leftTired: mood.lT, leftAngry: mood.lA,
+                leftHappy: mood.lH, leftFlat: mood.lF,
+                rightTired: mood.rT, rightAngry: mood.rA,
+                rightHappy: mood.rH, rightFlat: mood.rF,
                 leftHeightMul: mood.lM, rightHeightMul: mood.rM,
                 yOffset: mood.yo
             )

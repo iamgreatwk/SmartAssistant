@@ -244,7 +244,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - 序列播放器
     
     private func playSequence(_ name: String) {
-        guard let steps = config.sequenceSteps(for: name), !steps.isEmpty else { return }
+        guard let steps = exprConfig.sequenceSteps(for: name), !steps.isEmpty else { return }
         stopSequence()
         sequenceSteps = steps
         sequenceIndex = 0
@@ -649,7 +649,7 @@ class ChatViewModel: ObservableObject {
                 
                 if let v = c.pitch { ok = ok && rad2deg(attitude?.pitch ?? 0) < v }
                 if let v = c.roll { ok = ok && abs(rad2deg(attitude?.roll ?? 0)) > v }
-                if let v = c.gyroRate { ok = ok && (gyro?.magnitude ?? 0) > v }
+                if let v = c.gyroRate { ok = ok && (gyro != nil ? sqrt(gyro!.x*gyro!.x + gyro!.y*gyro!.y + gyro!.z*gyro!.z) : 0) > v }
                 if let v = c.speedKmh { ok = ok && (speedKmh ?? 0) > v }
                 if let v = c.accelBelow { ok = ok && (accel?.magnitude ?? 1.0) < v }
                 if let v = c.stillSeconds {
@@ -705,7 +705,6 @@ class ChatViewModel: ObservableObject {
         if let id = exprConfig.soundID(for: name) {
             AudioServicesPlaySystemSound(SystemSoundID(id))
         }
-        // 异步播放自定义 beep，绕过静音开关
         DispatchQueue.global().async {
             Self.playBeep(name: name)
         }
@@ -714,7 +713,7 @@ class ChatViewModel: ObservableObject {
     // 自定义 beep 音，不受静音开关影响
     private static var audioPlayer: AVAudioPlayer?
     
-    private static func playBeep(name: String) {
+    private nonisolated static func playBeep(name: String) {
         let duration = 0.15
         let sampleRate = 44100.0
         let frequency: Double = {

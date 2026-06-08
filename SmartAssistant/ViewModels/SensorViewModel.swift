@@ -133,8 +133,6 @@ class SensorViewModel: ObservableObject {
         microphoneService.stopMonitoring()
         sensorsRunning = false
     }
-        cameraService.stop()
-    }
     
     func startCamera() {
         cameraService.start()
