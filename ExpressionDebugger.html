@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小智表情调试器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a12;color:#ccc;font-family:-apple-system,sans-serif;display:flex;height:100vh;overflow:hidden}
+.left{width:340px;background:#111118;padding:8px;overflow-y:auto;border-right:1px solid #222}
+.right{flex:1;display:flex;align-items:center;justify-content:center;background:#050508}
+svg{width:100%;max-width:600px;aspect-ratio:2/1}
+h2{font-size:13px;color:#888;margin:6px 0 3px}
+input,textarea,select{width:100%;padding:3px 5px;margin:1px 0;background:#1a1a28;border:1px solid #333;border-radius:3px;color:#aaa;font-size:11px}
+textarea{resize:vertical;font-family:monospace}
+label{font-size:10px;color:#666}
+.slider{width:100%;accent-color:#7cfc00;margin:0}
+.toolbar{display:flex;gap:4px;margin-bottom:6px}
+.toolbar button{padding:5px 10px;background:#1a2a18;border:1px solid #2a5a2a;color:#8e8;border-radius:3px;cursor:pointer;font-size:11px}
+.toolbar button:hover{background:#1e301e}
+.toolbar button.export{background:#1a1a2a;border-color:#2a2a5a;color:#88e}
+.toolbar button.danger{background:#2a1a1a;border-color:#5a2a2a;color:#e88}
+.tabs{display:flex;gap:2px;margin-bottom:6px}
+.tab{padding:4px 10px;background:#1a1a28;border:1px solid #333;border-radius:4px 4px 0 0;cursor:pointer;font-size:11px;color:#777}
+.tab.active{background:#222240;border-color:#444;color:#aaa}
+.mood-btn{font-size:10px;padding:2px 5px;margin:1px}
+.mood-btn.active{background:#1a3020;border-color:#3a7040}
+.btns{display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px}
+.status{font-size:10px;color:#444;margin-top:4px}
+.row{display:flex;gap:4px}.row>*{flex:1}
+.section{display:none}.section.active{display:block}
+.kv-row{display:flex;gap:4px;align-items:center;margin:2px 0}
+.kv-row input{flex:1;font-size:10px}
+.kv-row button{font-size:10px;padding:2px 8px}
+.step-row{display:flex;gap:3px;align-items:center;margin:2px 0;font-size:10px}
+.step-row input{width:60px;font-size:10px}
+.step-row select{width:80px;font-size:10px}
+</style>
+</head>
+<body>
+<div class="left">
+  <div class="toolbar">
+    <button onclick="loadJSON()">📂 加载</button>
+    <button onclick="exportJSON()" class="export">💾 导出</button>
+    <button onclick="copyJSON()" class="danger">📋 复制</button>
+  </div>
+  <div class="status" id="status">请加载 expressions.json</div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('face')">😊 表情</div>
+    <div class="tab" onclick="switchTab('keyword')">🔤 关键词</div>
+    <div class="tab" onclick="switchTab('seq')">🎬 序列</div>
+    <div class="tab" onclick="switchTab('sensor')">📡 传感器</div>
+    <div class="tab" onclick="switchTab('cmd')">🎯 指令</div>
+  </div>
+
+  <!-- === 表情参数 === -->
+  <div class="section active" id="sec-face">
+    <div class="btns" id="moodBtns"></div>
+    <label>眼宽 <span id="vW">70</span></label><input type="range" min="30" max="100" value="70" class="slider" id="eyeW" oninput="updateParam()">
+    <label>眼高 <span id="vH">58</span></label><input type="range" min="20" max="100" value="58" class="slider" id="eyeH" oninput="updateParam()">
+    <label>圆角 <span id="vBR">24</span></label><input type="range" min="4" max="40" value="24" class="slider" id="br" oninput="updateParam()">
+    <label>间距 <span id="vSB">20</span></label><input type="range" min="8" max="50" value="20" class="slider" id="sb" oninput="updateParam()">
+    <div class="row">
+      <div><label>左疲倦</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="lT" oninput="updateParam()"><span id="vLT">0.00</span></div>
+      <div><label>右疲倦</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="rT" oninput="updateParam()"><span id="vRT">0.00</span></div>
+    </div>
+    <div class="row">
+      <div><label>左生气</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="lA" oninput="updateParam()"><span id="vLA">0.00</span></div>
+      <div><label>右生气</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="rA" oninput="updateParam()"><span id="vRA">0.00</span></div>
+    </div>
+    <div class="row">
+      <div><label>左开心</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="lH" oninput="updateParam()"><span id="vLH">0.00</span></div>
+      <div><label>右开心</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="rH" oninput="updateParam()"><span id="vRH">0.00</span></div>
+    </div>
+    <div class="row">
+      <div><label>左平顶</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="lF" oninput="updateParam()"><span id="vLF">0.00</span></div>
+      <div><label>右平顶</label><input type="range" min="0" max="1" step="0.01" value="0" class="slider" id="rF" oninput="updateParam()"><span id="vRF">0.00</span></div>
+    </div>
+    <div class="row">
+      <div><label>左倍率</label><input type="range" min="0" max="2" step="0.01" value="1" class="slider" id="lM" oninput="updateParam()"><span id="vLM">1.00</span></div>
+      <div><label>右倍率</label><input type="range" min="0" max="2" step="0.01" value="1" class="slider" id="rM" oninput="updateParam()"><span id="vRM">1.00</span></div>
+    </div>
+    <label>偏移 <span id="vYO">0</span></label><input type="range" min="-15" max="15" step="0.5" value="0" class="slider" id="yo" oninput="updateParam()">
+  </div>
+
+  <!-- === 关键词 === -->
+  <div class="section" id="sec-keyword">
+    <h2>情绪关键词</h2>
+    <select id="kwEmotion" onchange="loadKeywords()"><option>happy</option></select>
+    <textarea id="kwList" rows="3" placeholder="每行一个关键词" onchange="saveKeywords()"></textarea>
+  </div>
+
+  <!-- === 序列 === -->
+  <div class="section" id="sec-seq">
+    <h2>动画序列</h2>
+    <select id="seqName" onchange="loadSequence()"><option>greeting</option></select>
+    <div id="seqSteps"></div>
+    <button onclick="addSeqStep()">+ 添加帧</button>
+  </div>
+
+  <!-- === 传感器 === -->
+  <div class="section" id="sec-sensor">
+    <h2>传感器触发</h2>
+    <select id="trigName" onchange="loadTrigger()"><option>upsideDown</option></select>
+    <div class="row">
+      <label>表情<input id="trigE"></label>
+      <label>音效<input id="trigS"></label>
+      <label>持续(s)<input id="trigT" type="number" step="0.5"></label>
+    </div>
+    <h2 style="margin-top:6px">条件（AND）</h2>
+    <div id="trigConds"></div>
+    <label>JSON键<input id="trigNewKey" placeholder="如 speedKmh"></label>
+    <label>值<input id="trigNewVal" type="number" step="0.1"></label>
+    <button onclick="addTriggerCond()">+ 添加条件</button>
+    <button onclick="saveTrigger()" style="margin-top:4px">💾 保存触发</button>
+  </div>
+
+  <!-- === 指令 === -->
+  <div class="section" id="sec-cmd">
+    <h2>语音指令</h2>
+    <div id="cmdList"></div>
+    <div class="kv-row">
+      <input id="cmdNewKey" placeholder="关键词">
+      <input id="cmdNewExpr" placeholder="表情">
+      <input id="cmdNewCmd" placeholder="命令ID">
+      <button onclick="addCommand()">+</button>
+    </div>
+    <button onclick="saveCommands()" style="margin-top:4px">💾 保存指令</button>
+  </div>
+</div>
+<div class="right"><svg id="sv" viewBox="0 0 400 200"></svg></div>
+
+<script>
+const W=400,H=200,CX=W/2,CY=H/2,MC='#7cfc00',BG='#050508',L=(a,b)=>(a+b)/2;
+let moodData={normal:{eyeW:70,eyeH:58,br:24,sb:20,lT:0,rT:0,lA:0,rA:0,lH:0,rH:0,lF:0,rF:0,lM:1,rM:1,yo:0}};
+let fullConfig=null,currentMood='normal';
+let S={lxN:120,lyN:71,wN:70,hN:58,brN:24,sbN:20,lhN:58,rhN:58,lx:120,ly:71,w:70,h:58,br:24,sb:20,lh:58,rh:58,rx:0,lT:0,rT:0,lA:0,rA:0,lH:0,rH:0,lF:0,rF:0,lTN:0,rTN:0,lAN:0,rAN:0,lHN:0,rHN:0,lFN:0,rFN:0,yoN:0,nextBlink:180};
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelector(`.tab:nth-child(${{face:1,keyword:2,seq:3,sensor:4,cmd:5}[t]})`).classList.add('active');
+  document.getElementById(`sec-${t}`).classList.add('active');
+  if(t==='keyword') refreshKwDropdown();
+  if(t==='seq') refreshSeqDropdown();
+  if(t==='sensor') refreshTriggerDropdown();
+  if(t==='cmd') renderCommands();
+}
+
+// === 表情 ===
+function applyParams(){
+  const m=moodData[currentMood];
+  S.wN=m.eyeW;S.hN=m.eyeH;S.brN=m.br;S.sbN=m.sb;
+  S.lhN=m.eyeH*m.lM;S.rhN=m.eyeH*m.rM;
+  S.lTN=m.lT;S.rTN=m.rT;S.lAN=m.lA;S.rAN=m.rA;
+  S.lHN=m.lH;S.rHN=m.rH;S.lFN=m.lF;S.rFN=m.rF;S.yoN=m.yo;
+  S.lxN=CX-S.wN-S.sbN/2;S.lyN=CY-Math.max(S.lhN,S.rhN)/2;
+}
+function setMood(n){
+  currentMood=n;const m=moodData[n]||{eyeW:70,eyeH:58,br:24,sb:20,lT:0,rT:0,lA:0,rA:0,lH:0,rH:0,lF:0,rF:0,lM:1,rM:1,yo:0};
+  ['eyeW','eyeH','br','sb','lT','rT','lA','rA','lH','rH','lF','rF','lM','rM','yo'].forEach(k=>{document.getElementById(k).value=m[k];});
+  document.querySelectorAll('#moodBtns button').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+n);if(btn)btn.classList.add('active');
+  applyParams();
+}
+function updateParam(){
+  const m=moodData[currentMood];
+  ['eyeW','eyeH','br','sb','lT','rT','lA','rA','lH','rH','lF','rF','lM','rM','yo'].forEach(k=>{m[k]=+document.getElementById(k).value;});
+  applyParams();
+}
+
+// === JSON 加载导出 ===
+function loadJSON(){
+  const input=document.createElement('input');input.type='file';input.accept='.json';
+  input.onchange=e=>{
+    const r=new FileReader();r.onload=ev=>{
+      fullConfig=JSON.parse(ev.target.result);
+      if(fullConfig.moods){moodData=fullConfig.moods;initMoodBtns();setMood(Object.keys(moodData)[0]);}
+      document.getElementById('status').textContent='✅ '+Object.keys(moodData).length+' 种情绪';
+    };r.readAsText(e.target.files[0]);
+  };input.click();
+}
+function exportJSON(){
+  if(!fullConfig){alert('请先加载 JSON');return}
+  fullConfig.moods=moodData;
+  const b=new Blob([JSON.stringify(fullConfig,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='expressions.json';a.click();
+  document.getElementById('status').textContent='✅ 已导出';
+}
+function copyJSON(){
+  if(!fullConfig){alert('请先加载 JSON');return}
+  fullConfig.moods=moodData;
+  navigator.clipboard.writeText(JSON.stringify(fullConfig,null,2)).then(()=>document.getElementById('status').textContent='✅ 已复制到剪贴板');
+}
+
+// === 关键词 ===
+function refreshKwDropdown(){
+  if(!fullConfig?.emotionKeywords)return;
+  const s=document.getElementById('kwEmotion');s.innerHTML='';
+  Object.keys(fullConfig.emotionKeywords).forEach(k=>{const o=document.createElement('option');o.text=k;s.appendChild(o);});
+  loadKeywords();
+}
+function loadKeywords(){
+  const k=document.getElementById('kwEmotion').value;
+  document.getElementById('kwList').value=(fullConfig.emotionKeywords[k]||[]).join('\n');
+}
+function saveKeywords(){
+  const k=document.getElementById('kwEmotion').value;
+  fullConfig.emotionKeywords[k]=document.getElementById('kwList').value.split('\n').filter(x=>x.trim());
+}
+
+// === 序列 ===
+function refreshSeqDropdown(){
+  if(!fullConfig?.sequences)return;
+  const s=document.getElementById('seqName');s.innerHTML='';
+  Object.keys(fullConfig.sequences).forEach(k=>{const o=document.createElement('option');o.text=k;s.appendChild(o);});
+  loadSequence();
+}
+function loadSequence(){
+  const n=document.getElementById('seqName').value;
+  const steps=fullConfig.sequences[n]||[];
+  const d=document.getElementById('seqSteps');
+  d.innerHTML=steps.map((s,i)=>`<div class="step-row">
+    帧${i+1} <select onchange="updateSeqStep(${i})" id="seqExpr${i}">
+      ${Object.keys(moodData).map(k=>`<option ${s.e===k?'selected':''}>${k}</option>`).join('')}
+    </select>
+    视线X<input id="seqX${i}" value="${s.x||0}" onchange="updateSeqStep(${i})" type="number" step="0.1">
+    视线Y<input id="seqY${i}" value="${s.y||0}" onchange="updateSeqStep(${i})" type="number" step="0.1">
+    眨眼<input id="seqB${i}" type="checkbox" ${s.b?'checked':''} onchange="updateSeqStep(${i})">
+    <button onclick="delSeqStep(${i})">✕</button>
+  </div>`).join('');
+}
+function updateSeqStep(i){
+  const n=document.getElementById('seqName').value;
+  const s=fullConfig.sequences[n];
+  s[i].e=document.getElementById('seqExpr'+i).value;
+  s[i].x=+document.getElementById('seqX'+i).value;
+  s[i].y=+document.getElementById('seqY'+i).value;
+  s[i].b=document.getElementById('seqB'+i).checked;
+}
+function addSeqStep(){
+  const n=document.getElementById('seqName').value;
+  fullConfig.sequences[n].push({e:'normal',x:0,y:0,b:false});
+  loadSequence();
+}
+function delSeqStep(i){const n=document.getElementById('seqName').value;fullConfig.sequences[n].splice(i,1);loadSequence();}
+
+// === 传感器 ===
+function refreshTriggerDropdown(){
+  if(!fullConfig?.sensorTriggers)return;
+  const s=document.getElementById('trigName');s.innerHTML='';
+  Object.keys(fullConfig.sensorTriggers).forEach(k=>{const o=document.createElement('option');o.text=k;s.appendChild(o);});
+  loadTrigger();
+}
+function loadTrigger(){
+  const n=document.getElementById('trigName').value;
+  const t=fullConfig.sensorTriggers[n]||{};
+  document.getElementById('trigE').value=t.e||'normal';
+  document.getElementById('trigS').value=t.s||'';
+  document.getElementById('trigT').value=t.t||3;
+  const condFields=['pitch','roll','gyroRate','speedKmh','accelBelow','stillSeconds','luxBelow','altChange','stepsPerMin','proximity','tempAbove'];
+  const d=document.getElementById('trigConds');
+  d.innerHTML=condFields.filter(f=>t[f]!=null).map(f=>`<div class="kv-row">
+    <span style="width:80px">${f}</span>
+    <input value="${t[f]}" onchange="updateTriggerCond('${f}',this.value)">
+    <button onclick="deleteTriggerCond('${f}')">✕</button>
+  </div>`).join('');
+}
+function updateTriggerCond(f,v){
+  const n=document.getElementById('trigName').value;
+  fullConfig.sensorTriggers[n][f]=f==='proximity'?(v==='true'):+v;
+}
+function deleteTriggerCond(f){
+  const n=document.getElementById('trigName').value;
+  delete fullConfig.sensorTriggers[n][f];
+  loadTrigger();
+}
+function addTriggerCond(){
+  const n=document.getElementById('trigName').value;
+  const k=document.getElementById('trigNewKey').value.trim();
+  const v=document.getElementById('trigNewVal').value;
+  if(!k)return;
+  fullConfig.sensorTriggers[n]=fullConfig.sensorTriggers[n]||{};
+  fullConfig.sensorTriggers[n][k]=k==='proximity'?(v==='true'):+v;
+  loadTrigger();
+}
+function saveTrigger(){
+  const n=document.getElementById('trigName').value;
+  fullConfig.sensorTriggers[n]=fullConfig.sensorTriggers[n]||{};
+  fullConfig.sensorTriggers[n].e=document.getElementById('trigE').value;
+  fullConfig.sensorTriggers[n].s=document.getElementById('trigS').value||null;
+  fullConfig.sensorTriggers[n].t=+document.getElementById('trigT').value;
+  document.getElementById('status').textContent='✅ 传感器 '+n+' 已保存';
+}
+
+// === 指令 ===
+let cmdMap={};
+function renderCommands(){
+  if(!fullConfig?.commands){return}
+  cmdMap={...fullConfig.commands};
+  const d=document.getElementById('cmdList');
+  d.innerHTML=Object.entries(cmdMap).map(([k,v])=>`<div class="kv-row">
+    <span style="width:60px">${k}</span>
+    <input value="${v.e}" onchange="cmdMap['${k}'].e=this.value" style="width:60px">
+    <input value="${v.c}" onchange="cmdMap['${k}'].c=this.value" style="width:60px">
+    <button onclick="delete cmdMap['${k}'];saveCommands()">✕</button>
+  </div>`).join('');
+}
+function addCommand(){
+  const k=document.getElementById('cmdNewKey').value.trim();
+  if(!k||cmdMap[k])return;
+  cmdMap[k]={e:document.getElementById('cmdNewExpr').value.trim()||'speaking',c:document.getElementById('cmdNewCmd').value.trim()||''};
+  saveCommands();
+}
+function saveCommands(){fullConfig.commands=cmdMap;renderCommands();}
+
+// === 渲染 ===
+function drawE(lx,ly,w,h,br,tired,angry,happy,flat,tag){
+  let s='';if(h<=0)return s;
+  s+=`<rect x="${lx}" y="${ly}" width="${w}" height="${h}" rx="${br}" ry="${br}" fill="${MC}"/>`;
+  if(flat>.05){let fh=h*flat;s+=`<rect x="${lx-1}" y="${ly-1}" width="${w+2}" height="${fh+1}" fill="${BG}"/>`}
+  if(tired>.05){let th=h*tired;s+=tag==='L'?`<polygon points="${lx},${ly-1} ${lx+w},${ly-1} ${lx},${ly+th-1}" fill="${BG}"/>`:`<polygon points="${lx},${ly-1} ${lx+w},${ly-1} ${lx+w},${ly+th-1}" fill="${BG}"/>`}
+  if(angry>.05){let ah=h*angry;s+=tag==='L'?`<polygon points="${lx},${ly-1} ${lx+w},${ly-1} ${lx+w},${ly+ah}" fill="${BG}"/>`:`<polygon points="${lx},${ly-1} ${lx+w},${ly-1} ${lx},${ly+ah}" fill="${BG}"/>`}
+  if(happy>.05){let hh=h*happy;s+=`<rect x="${lx-1}" y="${ly+h-hh+1}" width="${w+2}" height="${h}" rx="${br}" fill="${BG}"/>`}
+  return s;
+}
+function render(){
+  S.lx=L(S.lx,S.lxN);S.ly=L(S.ly,S.lyN);S.w=L(S.w,S.wN);S.h=L(S.h,S.hN);
+  S.br=L(S.br,S.brN);S.sb=L(S.sb,S.sbN);S.lh=L(S.lh,S.lhN);S.rh=L(S.rh,S.rhN);
+  S.lT=L(S.lT,S.lTN);S.rT=L(S.rT,S.rTN);S.lA=L(S.lA,S.lAN);S.rA=L(S.rA,S.rAN);
+  S.lH=L(S.lH,S.lHN);S.rH=L(S.rH,S.rHN);S.lF=L(S.lF,S.lFN);S.rF=L(S.rF,S.rFN);
+  let yo=L(S.myo||0,S.yoN);S.myo=yo;let lw=S.w,rw=S.w,sb=S.sb;S.rx=S.lx+lw+sb;
+  S.nextBlink--;let blink=S.nextBlink<6;let lh=blink?1:S.lh,rh=blink?1:S.rh;
+  if(blink&&S.nextBlink===0)S.nextBlink=150+Math.floor(Math.random()*360);
+  let h=`<rect width="${W}" height="${H}" fill="${BG}"/>`;
+  h+=drawE(S.lx,S.ly+yo,lw,lh,S.br,S.lT,S.lA,S.lH,S.lF,'L');
+  h+=drawE(S.rx,S.ly+yo,rw,rh,S.br,S.rT,S.rA,S.rH,S.rF,'R');
+  document.getElementById('sv').innerHTML=h;requestAnimationFrame(render);
+}
+function initMoodBtns(){
+  const b=document.getElementById('moodBtns');b.innerHTML='';
+  Object.keys(moodData).forEach(k=>{const btn=document.createElement('button');btn.textContent=k;btn.className='mood-btn';btn.id='btn-'+k;btn.onclick=()=>setMood(k);b.appendChild(btn);});
+}
+initMoodBtns();setMood('normal');requestAnimationFrame(render);
+</script>
+</body>
+</html>
