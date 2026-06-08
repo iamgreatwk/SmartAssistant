@@ -18,6 +18,11 @@ struct ExpressionConfig: Codable {
     let shakeSpikeCount: Int
     let shakeDizzySeconds: Double
     let knockRecoverSeconds: Double
+    var speakingDurationSec: Double = 5.0
+    var speakingCycleIntervalSec: Double = 3.0
+    var commandDurationSec: Double = 3.0
+    var errorRecoverSec: Double = 4.0
+    var expressionEnrichIntervalSec: Double = 1.5
     let sensorTriggers: [String: SensorTriggerConfig]
     let camera: CameraConfig
     

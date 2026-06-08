@@ -167,6 +167,9 @@ struct ContentView: View {
                 if !chatVM.debugInfo.balance.isEmpty {
                     Text("余额: ¥\(chatVM.debugInfo.balance)")
                 }
+                if !chatVM.debugInfo.sensor.isEmpty {
+                    Text("传感器: \(chatVM.debugInfo.sensor)")
+                }
             }
             .font(.system(size: 9, design: .monospaced))
             .foregroundColor(.green.opacity(0.7))
@@ -176,6 +179,7 @@ struct ContentView: View {
             .cornerRadius(8)
             .padding(.trailing, 4)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
     
     private func handleTap() {}

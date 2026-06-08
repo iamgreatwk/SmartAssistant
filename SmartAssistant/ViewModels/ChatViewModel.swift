@@ -50,6 +50,7 @@ class ChatViewModel: ObservableObject {
         var tokens: Int = 0
         var totalTokens: Int = 0
         var balance: String = ""
+        var sensor: String = ""
     }
     
     // 情绪感知
@@ -172,13 +173,35 @@ class ChatViewModel: ObservableObject {
                     speedKmh: self?.locationService.currentLocation?.speedKMH,
                     altitude: self?.locationService.currentLocation?.altitude,
                     stepCount: self?.motionService.stepCount,
-                    proximity: UIDevice.current.proximityState)
+                    proximity: UIDevice.current.proximityState,
+                    lux: UIScreen.main.brightness * 1000)
+                // 更新调试信息
+                if let d = data {
+                    let ax = d.x, ay = d.y, az = d.z
+                    let mag = d.magnitude - 1.0
+                    let gyro = self?.motionService.gyroscopeData
+                    let gyroRate = gyro.map { sqrt($0.x*$0.x + $0.y*$0.y + $0.z*$0.z) } ?? 0
+                    let att = self?.motionService.deviceAttitude
+                    let roll = att.map { abs($0.roll * 180 / .pi) < 10 ? "" : String(format:" R:%.0f°", $0.roll * 180 / .pi) } ?? ""
+                    let pitch = att.map { abs($0.pitch * 180 / .pi) < 10 ? "" : String(format:" P:%.0f°", $0.pitch * 180 / .pi) } ?? ""
+                    let yaw = att.map { abs($0.yaw * 180 / .pi) < 15 ? "" : String(format:" Y:%.0f°", $0.yaw * 180 / .pi) } ?? ""
+                    let magData = self?.motionService.magnetometerData
+                    let heading = magData.map { String(format:" 🧭%.0f°", atan2($0.y, $0.x) * 180 / .pi) } ?? ""
+                    let speed = (self?.locationService.currentLocation?.speedKMH).map { $0 > 2 ? String(format:" 🏃%.0fkm/h", $0) : "" } ?? ""
+                    let alt = (self?.locationService.currentLocation?.altitude).map { String(format:" %.0fm", $0) } ?? ""
+                    let steps = (self?.motionService.stepCount ?? 0) > 0 ? " 👣\(self?.motionService.stepCount ?? 0)" : ""
+                    let prox = UIDevice.current.proximityState ? " 近" : ""
+                    let brightness = UIScreen.main.brightness
+                    let light = brightness < 0.3 ? " 🌑" : brightness > 0.8 ? " ☀️" : ""
+                    let shake = abs(mag) > 0.8 ? " ⚡" : ""
+                    self?.debugInfo.sensor = String(format:"a:%.1fg%@ g:%.0f%@%@%@%@%@%@%@%@%@", mag, shake, gyroRate, roll, pitch, yaw, heading, speed, alt, steps, light, prox)
+                }
             }
             .store(in: &cancellables)
         $ttsConfig
             .sink { [weak self] config in self?.speaker.updateConfig(config) }
             .store(in: &cancellables)
-        Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
+        Timer.publish(every: exprConfig.expressionEnrichIntervalSec, on: .main, in: .common).autoconnect()
             .sink { [weak self] _ in self?.enrichExpression() }
             .store(in: &cancellables)
     }
@@ -357,7 +380,7 @@ class ChatViewModel: ObservableObject {
             } else {
                 currentExpression = expr
                 playSequence("excited")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.commandDurationSec) { [weak self] in
                     self?.conversationState = .idle
                     self?.currentExpression = .normal
                 }
@@ -388,7 +411,7 @@ class ChatViewModel: ObservableObject {
             playSound("error")
             messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
             // 错误后自动恢复
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.errorRecoverSec) { [weak self] in
                 self?.conversationState = .idle
                 self?.currentExpression = .normal
                 self?.lookX = 0; self?.lookY = 0
@@ -448,7 +471,7 @@ class ChatViewModel: ObservableObject {
             playSound("error")
             messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
             // 错误后自动恢复
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.errorRecoverSec) { [weak self] in
                 self?.conversationState = .idle
                 self?.currentExpression = .normal
                 self?.lookX = 0; self?.lookY = 0
@@ -512,7 +535,7 @@ class ChatViewModel: ObservableObject {
             startSpeakingCycle(finalExpr)
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.speakingDurationSec) { [weak self] in
             guard self?.conversationState == .speaking else { return }
             self?.stopSpeakingCycle()
             self?.conversationState = .idle
@@ -542,8 +565,8 @@ class ChatViewModel: ObservableObject {
         
         // 尖峰检测（敲击/短冲击）
         if delta > exprConfig.shakeThreshold {
-            // 距上次尖峰超过 0.5s 则重置计数（区分敲击和持续摇晃）
-            if now.timeIntervalSince(lastSpikeTime) > 0.5 { spikeCount = 0 }
+            // 距上次尖峰超过 knockRecoverSeconds 则重置计数
+            if now.timeIntervalSince(lastSpikeTime) > exprConfig.knockRecoverSeconds { spikeCount = 0 }
             spikeCount += 1
             lastSpikeTime = now
             
@@ -554,9 +577,9 @@ class ChatViewModel: ObservableObject {
                     currentExpression = .confused
                     playSound("dizzy")
                     spikeCount = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.shakeDizzySeconds) { [weak self] in
                         self?.isDizzy = false
-                        if self?.conversationState == .idle { self?.currentExpression = .normal }
+                        self?.currentExpression = .normal
                     }
                 }
             } else if spikeCount == 1 {
@@ -566,7 +589,7 @@ class ChatViewModel: ObservableObject {
                 currentExpression = .surprised
                 lookX = 0; lookY = -0.4
                 playSound("happy")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.knockRecoverSeconds) { [weak self] in
                     if self?.currentExpression == .surprised {
                         self?.currentExpression = saved
                         self?.lookX = savedX; self?.lookY = savedY
@@ -594,7 +617,7 @@ class ChatViewModel: ObservableObject {
                                stepCount: Int? = nil,
                                proximity: Bool? = nil,
                                lux: Double? = nil) {
-        guard case .idle = conversationState else { return }
+        guard !isPlayingSequence, !isDizzy else { return }
         let now = Date()
         
         // 读取 JSON 配置列表中每一项来检测
@@ -654,7 +677,7 @@ class ChatViewModel: ObservableObject {
                     playSound(sound)
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + cfg.t) { [weak self] in
-                    if self?.conversationState == .idle {
+                    if self?.isPlayingSequence == false, self?.isDizzy == false {
                         self?.currentExpression = .normal
                     }
                 }
@@ -751,7 +774,7 @@ class ChatViewModel: ObservableObject {
         speakingCycle = names.compactMap { ExpressionType(rawValue: $0) }
         speakingCycleIndex = 0
         speakingCycleTimer?.cancel()
-        speakingCycleTimer = Timer.publish(every: 3.0, on: .main, in: .common)
+        speakingCycleTimer = Timer.publish(every: exprConfig.speakingCycleIntervalSec, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self, self.conversationState == .speaking, !self.speakingCycle.isEmpty else { return }
