@@ -75,65 +75,6 @@ class ChatViewModel: ObservableObject {
         case error(String)
     }
     
-    // MARK: - 动画序列定义
-    
-    struct SeqStep {
-        let expr: ExpressionType
-        let lx: CGFloat
-        let ly: CGFloat
-        let isBlink: Bool
-        
-        init(_ e: ExpressionType, x: CGFloat = 0, y: CGFloat = 0, blink: Bool = false) {
-            expr = e; lx = x; ly = y; isBlink = blink
-        }
-    }
-    
-    static let sequences: [String: [SeqStep]] = [
-        "greeting": [
-            SeqStep(.surprised), SeqStep(.surprised, x: 0, y: -0.4),
-            SeqStep(.happy), SeqStep(.happy, x: 0.4, y: 0),
-            SeqStep(.happy, x: -0.4, y: 0), SeqStep(.happy),
-            SeqStep(.normal)
-        ],
-        "surprise": [
-            SeqStep(.surprised, y: -0.5), SeqStep(.surprised),
-            SeqStep(.scared, blink: true), SeqStep(.surprised, blink: true),
-            SeqStep(.surprised), SeqStep(.normal)
-        ],
-        "thinking": [
-            SeqStep(.focused, y: -0.5), SeqStep(.focused, x: -0.4),
-            SeqStep(.focused, x: 0.4), SeqStep(.wink),
-            SeqStep(.normal)
-        ],
-        "error": [
-            SeqStep(.surprised), SeqStep(.scared),
-            SeqStep(.angry), SeqStep(.sad, y: 0.4, blink: true),
-            SeqStep(.sad), SeqStep(.normal)
-        ],
-        "sadness": [
-            SeqStep(.normal, y: 0.3), SeqStep(.sad),
-            SeqStep(.sleepy, blink: true), SeqStep(.sad),
-            SeqStep(.normal)
-        ],
-        "curious": [
-            SeqStep(.normal, x: -0.5, y: 0), SeqStep(.normal, x: 0.5),
-            SeqStep(.normal, y: -0.4), SeqStep(.surprised, y: 0.3),
-            SeqStep(.focused), SeqStep(.normal)
-        ],
-        "sleepySeq": [
-            SeqStep(.normal), SeqStep(.sleepy),
-            SeqStep(.sleepy, blink: true), SeqStep(.sleepy, blink: true),
-            SeqStep(.sleepy)
-        ],
-        "excited": [
-            SeqStep(.surprised, y: -0.5), SeqStep(.happy),
-            SeqStep(.happy, x: -0.5), SeqStep(.happy, x: 0.5),
-            SeqStep(.happy, y: -0.4), SeqStep(.happy, y: 0.3),
-            SeqStep(.happy, blink: true), SeqStep(.love),
-            SeqStep(.happy), SeqStep(.normal)
-        ],
-    ]
-    
     // 情绪→序列映射
     static let emotionToSequence: [ExpressionType: String] = [
         .veryHappy: "excited", .excited: "excited",
@@ -145,7 +86,7 @@ class ChatViewModel: ObservableObject {
     ]
     
     private var sequenceTimer: AnyCancellable?
-    private var sequenceSteps: [SeqStep] = []
+    private var sequenceSteps: [ExpressionType.SeqStep] = []
     private var sequenceIndex = 0
     private var isPlayingSequence = false
     
@@ -711,7 +652,7 @@ class ChatViewModel: ObservableObject {
     }
     
     // 自定义 beep 音，不受静音开关影响
-    private static var audioPlayer: AVAudioPlayer?
+    nonisolated(unsafe) private static var audioPlayer: AVAudioPlayer?
     
     private nonisolated static func playBeep(name: String) {
         let duration = 0.15
