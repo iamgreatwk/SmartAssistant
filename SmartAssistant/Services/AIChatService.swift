@@ -27,9 +27,9 @@ class AIChatService: ObservableObject {
     
     // MARK: - 发送消息
     
-    func sendMessage(_ text: String, sensorContext: String? = nil) async throws -> String {
+    func sendMessage(_ text: String, sensorContext: String? = nil) async throws -> (text: String, tokens: Int) {
         guard !text.trimmingCharacters(in: .whitespaces).isEmpty else {
-            return ""
+            return ("", 0)
         }
         
         guard !config.aiApiKey.isEmpty else {
@@ -67,18 +67,18 @@ class AIChatService: ObservableObject {
             model: config.aiModel
         )
         
-        let response = try await performRequest(request)
+        let (text, tokens) = try await performRequest(request)
         
         // 添加助手回复到历史
-        let assistantMessage = ChatRequest.ChatRequestMessage(role: "assistant", content: response)
+        let assistantMessage = ChatRequest.ChatRequestMessage(role: "assistant", content: text)
         conversationHistory.append(assistantMessage)
         
-        return response
+        return (text, tokens)
     }
     
     // MARK: - 执行 HTTP 请求
     
-    private func performRequest(_ chatRequest: ChatRequest) async throws -> String {
+    private func performRequest(_ chatRequest: ChatRequest) async throws -> (text: String, tokens: Int) {
         guard let url = URL(string: config.aiApiEndpoint) else {
             throw ChatError.invalidURL
         }
@@ -112,7 +112,7 @@ class AIChatService: ObservableObject {
             throw ChatError.emptyResponse
         }
         
-        return content
+        return (content, chatResponse.usage?.totalTokens ?? 0)
     }
     
     // MARK: - 流式对话

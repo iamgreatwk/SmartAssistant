@@ -20,6 +20,7 @@ class SensorViewModel: ObservableObject {
     @Published var isCameraActive: Bool = false
     @Published var isMicrophoneActive: Bool = false
     @Published var audioLevel: Float = 0
+    @Published var sensorsRunning: Bool = false
     
     // 权限状态
     @Published var permissionStatuses: [String: PermissionStatus] = [:]
@@ -123,12 +124,15 @@ class SensorViewModel: ObservableObject {
         motionService.startAllSensors()
         locationService.startUpdatingLocation()
         microphoneService.startMonitoring()
+        sensorsRunning = true
     }
     
     func stopAllSensors() {
         motionService.stopAllSensors()
         locationService.stopUpdatingLocation()
         microphoneService.stopMonitoring()
+        sensorsRunning = false
+    }
         cameraService.stop()
     }
     

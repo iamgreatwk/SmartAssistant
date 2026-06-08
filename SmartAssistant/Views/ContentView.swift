@@ -10,10 +10,11 @@ struct ContentView: View {
     @StateObject private var cameraService = CameraService()
     
     @State private var showSettings: Bool = false
-    @State private var settingsOffset: CGFloat = -UIScreen.main.bounds.width
+    @State private var settingsOffset: CGFloat = -10000
     @State private var hasAutoStarted = false
-    @State private var photoOffset: CGFloat = UIScreen.main.bounds.width
+    @State private var photoOffset: CGFloat = 10000
     @State private var photoOpacity: Double = 0
+    @State private var screenWidth: CGFloat = 0
     
     var body: some View {
         GeometryReader { geo in
@@ -54,10 +55,24 @@ struct ContentView: View {
                 // 设置抽屉
                 settingsDrawer(width: geo.size.width)
                 leftEdgeDragZone(width: geo.size.width)
+            }
+            .onAppear {
+                screenWidth = geo.size.width
+                settingsOffset = -screenWidth
+            }
+            .onChange(of: geo.size.width) { _, w in
+                screenWidth = w
+                if !showSettings { settingsOffset = -w }
+            }
                 
                 // 照片预览卡片（右侧显示）
                 if let photo = chatVM.capturedPhoto {
                     photoCard(photo: photo, width: geo.size.width, height: geo.size.height)
+                }
+                
+                // 调试信息
+                if chatVM.getConfig().debugMode {
+                    debugOverlay(width: geo.size.width)
                 }
             }
         }
@@ -161,7 +176,7 @@ struct ContentView: View {
     }
     
     private func showPhoto() {
-        photoOffset = UIScreen.main.bounds.width
+        photoOffset = screenWidth
         photoOpacity = 0
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
             photoOffset = 0
@@ -171,7 +186,7 @@ struct ContentView: View {
     
     private func dismissPhoto() {
         withAnimation(.easeInOut(duration: 0.3)) {
-            photoOffset = UIScreen.main.bounds.width
+            photoOffset = screenWidth
             photoOpacity = 0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -198,16 +213,33 @@ struct ContentView: View {
         }
     }
     
+    // MARK: - 调试信息
+    
+    private func debugOverlay(width: CGFloat) -> some View {
+        HStack {
+            Spacer()
+            VStack(alignment: .leading, spacing: 1) {
+                Text("🔊 \(chatVM.debugInfo.sttText)")
+                Text("📤 \(chatVM.debugInfo.aiInput)")
+                Text("📥 \(chatVM.debugInfo.aiOutput)")
+                Text("😊 \(chatVM.debugInfo.expression)")
+                Text("🔄 \(chatVM.debugInfo.workflow)")
+                Text("🔢 \(chatVM.debugInfo.tokens) tokens")
+            }
+            .font(.system(size: 9, design: .monospaced))
+            .foregroundColor(.green.opacity(0.7))
+            .padding(8)
+            .background(.black.opacity(0.85))
+            .cornerRadius(8)
+            .padding(.trailing, 8)
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+    }
+    
     // MARK: - 交互
     
     private func handleTap() {
-        if chatVM.isListening {
-            chatVM.stopListening()
-        } else if chatVM.isSpeaking {
-            chatVM.stopSpeaking()
-        } else {
-            chatVM.startListening()
-        }
+        // 暂不响应屏幕点击
     }
     
     // MARK: - 设置抽屉

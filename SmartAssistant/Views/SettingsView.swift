@@ -119,6 +119,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("表情动画", isOn: $config.enableExpression)
                     Toggle("传感器面板", isOn: $config.showSensorDashboard)
+                    Toggle("调试模式", isOn: $config.debugMode)
                 } header: {
                     Label("显示设置", systemImage: "rectangle.3.group")
                 }
@@ -126,15 +127,20 @@ struct SettingsView: View {
                 // MARK: - 传感器控制
                 Section {
                     Button {
-                        sensorVM.startAllSensors()
+                        if sensorVM.sensorsRunning {
+                            sensorVM.stopAllSensors()
+                        } else {
+                            sensorVM.startAllSensors()
+                        }
                     } label: {
-                        Label("启动所有传感器", systemImage: "play.fill")
-                    }
-                    
-                    Button {
-                        sensorVM.stopAllSensors()
-                    } label: {
-                        Label("停止所有传感器", systemImage: "stop.fill")
+                        HStack {
+                            Label(sensorVM.sensorsRunning ? "传感器运行中" : "传感器已停止",
+                                  systemImage: sensorVM.sensorsRunning ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                            Spacer()
+                            Circle()
+                                .fill(sensorVM.sensorsRunning ? Color.green : Color.gray)
+                                .frame(width: 10, height: 10)
+                        }
                     }
                 } header: {
                     Label("传感器控制", systemImage: "sensor.fill")

@@ -7,14 +7,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        
-        // 配置音频会话
         configureAudioSession()
-        
-        // 注册通知
         registerNotifications()
-        
         return true
+    }
+    
+    // 仅横屏
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        return .landscape
     }
     
     private func configureAudioSession() {

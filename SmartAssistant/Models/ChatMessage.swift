@@ -55,6 +55,7 @@ struct ChatRequest: Codable {
 
 struct ChatResponse: Codable {
     let choices: [Choice]
+    let usage: Usage?
     
     struct Choice: Codable {
         let message: Message
@@ -69,6 +70,18 @@ struct ChatResponse: Codable {
     struct Message: Codable {
         let role: String
         let content: String
+    }
+    
+    struct Usage: Codable {
+        let promptTokens: Int
+        let completionTokens: Int
+        let totalTokens: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case promptTokens = "prompt_tokens"
+            case completionTokens = "completion_tokens"
+            case totalTokens = "total_tokens"
+        }
     }
 }
 
@@ -110,6 +123,7 @@ struct AppConfig: Codable {
     var autoListen: Bool = true
     var showSensorDashboard: Bool = true
     var enableExpression: Bool = true
+    var debugMode: Bool = false
     
     static func load() -> AppConfig {
         guard let data = UserDefaults.standard.data(forKey: "appConfig"),

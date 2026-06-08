@@ -1,11 +1,17 @@
 import Foundation
 import Combine
 import SwiftUI
+import UIKit
 import AudioToolbox
+import AVFoundation
 
-/// 聊天 ViewModel — 协调语音对话流程 + 表情动画序列
+/// 聊天 ViewModel — 表情动画引擎（从 expressions.json 读取配置）
 @MainActor
 class ChatViewModel: ObservableObject {
+    
+    // MARK: - 配置
+    
+    private let exprConfig = ExpressionConfig.shared
     
     // MARK: - 发布属性
     
@@ -23,6 +29,7 @@ class ChatViewModel: ObservableObject {
     // 摄像头/照片
     @Published var cameraActive = false
     @Published var capturedPhoto: UIImage?
+    @Published var cameraMode: String = "photo"  // photo/face/object/gesture
     
     // 视线方向（-1~1，-1=左/上，0=中心，+1=右/下）
     @Published var lookX: CGFloat = 0
@@ -31,6 +38,18 @@ class ChatViewModel: ObservableObject {
     // 对话状态
     @Published var conversationState: ConversationState = .idle
     
+    // 调试信息
+    @Published var debugInfo = DebugInfo()
+    
+    struct DebugInfo {
+        var sttText: String = ""
+        var aiInput: String = ""
+        var aiOutput: String = ""
+        var expression: String = ""
+        var workflow: String = "空闲"
+        var tokens: Int = 0
+    }
+    
     // 情绪感知
     @Published var userMood: ExpressionType = .normal
     private var recentMoods: [ExpressionType] = []
@@ -38,6 +57,15 @@ class ChatViewModel: ObservableObject {
     // 摇晃检测
     private var lastAccel: Double = 1.0
     private var isDizzy = false
+    private var spikeCount = 0      // 连续尖峰计数
+    private var lastSpikeTime: Date = .distantPast
+    
+    // MARK: - 调试日志
+    
+    private func logDebug(_ keypath: WritableKeyPath<DebugInfo, String>, _ value: String) {
+        guard self.config.debugMode else { return }
+        debugInfo[keyPath: keypath] = value
+    }
     
     enum ConversationState: Equatable {
         case idle
@@ -166,6 +194,13 @@ class ChatViewModel: ObservableObject {
     init() {
         self.config = .load()
         setupBindings()
+        motionService.startAccelerometer()
+        motionService.startGyroscope()
+        motionService.startDeviceMotion()
+        motionService.startPedometer()
+        locationService.startUpdatingLocation()
+        // 距离传感器
+        UIDevice.current.isProximityMonitoringEnabled = true
     }
     
     private func setupBindings() {
@@ -184,11 +219,18 @@ class ChatViewModel: ObservableObject {
             .sink { [weak self] level in self?.speakingLevel = CGFloat(level) }
             .store(in: &cancellables)
         
-        // 摇晃检测：加速度突变 → 头晕
+        // 加速度：摇晃 + 传感器触发
         motionService.$accelerometerData
             .receive(on: DispatchQueue.main)
             .sink { [weak self] data in
                 self?.detectShake(data)
+                self?.detectSensorTriggers(accel: data,
+                    gyro: self?.motionService.gyroscopeData,
+                    attitude: self?.motionService.deviceAttitude,
+                    speedKmh: self?.locationService.currentLocation?.speedKMH,
+                    altitude: self?.locationService.currentLocation?.altitude,
+                    stepCount: self?.motionService.stepCount,
+                    proximity: UIDevice.current.proximityState)
             }
             .store(in: &cancellables)
         $ttsConfig
@@ -202,7 +244,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - 序列播放器
     
     private func playSequence(_ name: String) {
-        guard let steps = Self.sequences[name], !steps.isEmpty else { return }
+        guard let steps = config.sequenceSteps(for: name), !steps.isEmpty else { return }
         stopSequence()
         sequenceSteps = steps
         sequenceIndex = 0
@@ -248,10 +290,10 @@ class ChatViewModel: ObservableObject {
         
         switch conversationState {
         case .listening:
-            // 聆听：专注/思考/好奇 随机切换
-            let exprs: [ExpressionType] = [.listening, .focused, .listening, .thinking, .listening]
-            let looks: [(CGFloat, CGFloat)] = [(0, -0.2), (0, -0.3), (0.2, -0.15), (-0.2, -0.15)]
+            // 聆听：专注 + 偶尔好奇扫视
             if Int.random(in: 0...2) == 0 {
+                let exprs = exprConfig.expressionArray(from: exprConfig.listeningExpressions)
+                let looks: [(CGFloat, CGFloat)] = [(0, -0.2), (0, -0.3), (0.2, -0.15), (-0.2, -0.15)]
                 withAnimation(.easeInOut(duration: 0.5)) {
                     currentExpression = exprs.randomElement() ?? .listening
                     let l = looks.randomElement()!
@@ -260,9 +302,9 @@ class ChatViewModel: ObservableObject {
             }
         case .thinking:
             // 思考：思考/专注/困惑/怀疑 循环
-            let exprs: [ExpressionType] = [.thinking, .focused, .confused, .thinking, .suspicious]
-            let looks: [(CGFloat, CGFloat)] = [(0, -0.5), (0.4, -0.4), (-0.4, -0.3), (0, -0.6)]
             if Int.random(in: 0...2) == 0 {
+                let exprs = exprConfig.expressionArray(from: exprConfig.thinkingExpressions)
+                let looks: [(CGFloat, CGFloat)] = [(0, -0.5), (0.4, -0.4), (-0.4, -0.3), (0, -0.6)]
                 withAnimation(.easeInOut(duration: 0.6)) {
                     currentExpression = exprs.randomElement() ?? .thinking
                     let l = looks.randomElement()!
@@ -279,10 +321,7 @@ class ChatViewModel: ObservableObject {
         case .idle:
             // 空闲：10种表情随机 + 扫视
             if Int.random(in: 0...6) == 0 {
-                let exprs: [ExpressionType] = [
-                    .normal, .cool, .happy, .thinking, .wink,
-                    .focused, .normal, .shy, .listening, .normal
-                ]
+                let exprs = exprConfig.expressionArray(from: exprConfig.idleExpressions)
                 let looks: [(CGFloat, CGFloat)] = [
                     (0,0), (0.5,0), (-0.5,0), (0,0.3), (0,-0.3), (0.3,0.2), (-0.3,0.2), (0,0), (0,-0.1)
                 ]
@@ -315,9 +354,9 @@ class ChatViewModel: ObservableObject {
     ]
 
     private func detectCommand(_ text: String) -> (ExpressionType, String)? {
-        let t = text.lowercased()
-        for (keyword, (expr, cmd)) in Self.commands {
-            if t.contains(keyword) { return (expr, cmd) }
+        if let cmd = exprConfig.detectCommand(text),
+           let expr = ExpressionType(rawValue: cmd.expression) {
+            return (expr, cmd.command)
         }
         return nil
     }
@@ -334,6 +373,7 @@ class ChatViewModel: ObservableObject {
             conversationState = .listening
             currentExpression = .listening
             lookX = 0; lookY = -0.2
+            logDebug(\.workflow, "🎧 聆听中")
         } catch {}
     }
     
@@ -355,6 +395,11 @@ class ChatViewModel: ObservableObject {
         userMood = detectedMood
         recentMoods.append(detectedMood)
         if recentMoods.count > 10 { recentMoods.removeFirst() }
+        
+        logDebug(\.workflow, "🧠 思考中...")
+        logDebug(\.sttText, trimmed)
+        logDebug(\.aiInput, trimmed)
+        logDebug(\.aiOutput, "等待AI...")
         
         messages.append(ChatMessage(role: .user, content: trimmed))
         conversationState = .thinking
@@ -381,9 +426,13 @@ class ChatViewModel: ObservableObject {
         // 普通对话
         let sensorContext = collectSensorContext()
         do {
-            let response = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
+            let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
+            debugInfo.tokens = tokens
             let aiEmotion = parseEmotion(response)
+            logDebug(\.aiOutput, response)
+            logDebug(\.expression, aiEmotion.displayName)
+            logDebug(\.workflow, "🎭 表情: \(aiEmotion.displayName)")
             messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
             respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
         } catch {
@@ -427,9 +476,13 @@ class ChatViewModel: ObservableObject {
         
         let sensorContext = collectSensorContext()
         do {
-            let response = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
+            let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
+            debugInfo.tokens = tokens
             let aiEmotion = parseEmotion(response)
+            logDebug(\.aiOutput, response)
+            logDebug(\.expression, aiEmotion.displayName)
+            logDebug(\.workflow, "🎭 表情: \(aiEmotion.displayName)")
             messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
             respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
         } catch {
@@ -471,8 +524,9 @@ class ChatViewModel: ObservableObject {
         stopSequence()
         
         // 根据用户情绪选回应方式
-        let empathy = Self.petEmpathy[userMood]
-        let finalExpr = empathy ?? aiEmotion
+        let empathyName = exprConfig.empathy(for: userMood.rawValue)
+        let empathyExpr = empathyName.flatMap { ExpressionType(rawValue: $0) }
+        let finalExpr = empathyExpr ?? aiEmotion
         playSound(finalExpr.rawValue)
         
         // 长时间情绪低落 → 主动安慰
@@ -482,7 +536,7 @@ class ChatViewModel: ObservableObject {
                 self?.currentExpression = .happy
                 self?.startSpeakingCycle(.happy)
             }
-        } else if let seqName = Self.emotionToSequence[finalExpr] {
+        } else if let seqName = exprConfig.sequenceName(for: finalExpr.rawValue) {
             playSequence(seqName)
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
                 guard self?.conversationState == .speaking else { return }
@@ -509,7 +563,7 @@ class ChatViewModel: ObservableObject {
     /// 最近 5 条情绪中有超过一半是负面情绪
     private func isUserSad() -> Bool {
         let recent = recentMoods.suffix(5)
-        let negative: Set<ExpressionType> = [.sad, .angry, .scared, .bored, .sleepy, .confused]
+        let negative = Set(exprConfig.negativeEmotions.compactMap { ExpressionType(rawValue: $0) })
         let negCount = recent.filter { negative.contains($0) }.count
         return negCount >= 3
     }
@@ -521,47 +575,219 @@ class ChatViewModel: ObservableObject {
         if case .error = conversationState { return }
         let mag = data.magnitude
         let delta = abs(mag - lastAccel)
+        let now = Date()
         lastAccel = mag
         
-        // 加速度突变 >2.5G → 触发眩晕
-        if delta > 2.5 && !isDizzy {
-            isDizzy = true
-            currentExpression = .confused
-            playSound("dizzy")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-                self?.isDizzy = false
-                if self?.conversationState == .idle {
-                    self?.currentExpression = .normal
+        // 尖峰检测（敲击/短冲击）
+        if delta > exprConfig.shakeThreshold {
+            // 距上次尖峰超过 0.5s 则重置计数（区分敲击和持续摇晃）
+            if now.timeIntervalSince(lastSpikeTime) > 0.5 { spikeCount = 0 }
+            spikeCount += 1
+            lastSpikeTime = now
+            
+            if spikeCount >= exprConfig.shakeSpikeCount {
+                // 连续 3 次尖峰 → 摇晃眩晕
+                if !isDizzy {
+                    isDizzy = true
+                    currentExpression = .confused
+                    playSound("dizzy")
+                    spikeCount = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                        self?.isDizzy = false
+                        if self?.conversationState == .idle { self?.currentExpression = .normal }
+                    }
+                }
+            } else if spikeCount == 1 {
+                // 单次尖峰 → 敲击反应
+                let saved = currentExpression
+                let savedX = lookX, savedY = lookY
+                currentExpression = .surprised
+                lookX = 0; lookY = -0.4
+                playSound("happy")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                    if self?.currentExpression == .surprised {
+                        self?.currentExpression = saved
+                        self?.lookX = savedX; self?.lookY = savedY
+                    }
                 }
             }
         }
     }
     
-    // MARK: - 声音效果
+    // MARK: - 传感器触发系统
+    
+    private var lastTriggerTime: [String: Date] = [:]
+    private var stillSince: Date?
+    private var lastAltitude: Double?
+    private var lastStepCount: Int = 0
+    private var lastStepTime: Date?
+    private func rad2deg(_ rad: Double) -> Double { rad * 180 / .pi }
+    
+    /// 统一传感器检测入口，每个触发由 JSON 配置驱动
+    func detectSensorTriggers(accel: AccelerometerData? = nil,
+                               gyro: GyroscopeData? = nil,
+                               attitude: DeviceAttitude? = nil,
+                               speedKmh: Double? = nil,
+                               altitude: Double? = nil,
+                               stepCount: Int? = nil,
+                               proximity: Bool? = nil,
+                               lux: Double? = nil) {
+        guard case .idle = conversationState else { return }
+        let now = Date()
+        
+        // 读取 JSON 配置列表中每一项来检测
+        let triggers = exprConfig.sensorTriggers
+        for (triggerName, cfg) in triggers {
+            // 防重复：上次触发后时间 < 配置的恢复时间
+            if let last = lastTriggerTime[triggerName],
+               now.timeIntervalSince(last) < cfg.t * 2 { continue }
+            
+            let triggered: Bool = {
+                // 通用多传感器检测：JSON 里有值的条件全部需满足（AND）
+                let c = cfg
+                var ok = true
+                
+                if let v = c.pitch { ok = ok && rad2deg(attitude?.pitch ?? 0) < v }
+                if let v = c.roll { ok = ok && abs(rad2deg(attitude?.roll ?? 0)) > v }
+                if let v = c.gyroRate { ok = ok && (gyro?.magnitude ?? 0) > v }
+                if let v = c.speedKmh { ok = ok && (speedKmh ?? 0) > v }
+                if let v = c.accelBelow { ok = ok && (accel?.magnitude ?? 1.0) < v }
+                if let v = c.stillSeconds {
+                    let moving = accel?.isMoving ?? false
+                    if !moving {
+                        if stillSince == nil { stillSince = now }
+                        ok = ok && now.timeIntervalSince(stillSince!) > v
+                    } else { stillSince = nil; ok = false }
+                }
+                if let v = c.luxBelow { ok = ok && (lux ?? 999) < v }
+                if let v = c.altChange {
+                    if let alt = altitude, let last = lastAltitude {
+                        let change = alt - last
+                        lastAltitude = alt
+                        ok = ok && (v > 0 ? change > v : change < v)
+                    } else { lastAltitude = altitude; ok = false }
+                }
+                if let v = c.stepsPerMin {
+                    if let steps = stepCount, steps > lastStepCount {
+                        let now2 = Date()
+                        if let lt = lastStepTime {
+                            let mins = now2.timeIntervalSince(lt) / 60.0
+                            let sd = steps - lastStepCount
+                            ok = ok && Int(Double(sd) / max(mins, 0.01)) >= v
+                        }
+                        lastStepCount = steps; lastStepTime = now2
+                    }
+                }
+                if let v = c.proximity { ok = ok && proximity == v }
+                
+                return ok && !cfg.e.isEmpty  // 至少指定了表情才算条件生效
+            }()
+            
+            if triggered {
+                lastTriggerTime[triggerName] = now
+                if let expr = ExpressionType(rawValue: cfg.e) {
+                    currentExpression = expr
+                }
+                if let sound = cfg.s {
+                    playSound(sound)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + cfg.t) { [weak self] in
+                    if self?.conversationState == .idle {
+                        self?.currentExpression = .normal
+                    }
+                }
+            }
+        }
+    }
     
     func playSound(_ name: String) {
-        switch name {
-        case "camera":     AudioServicesPlaySystemSound(1108)  // 快门声
-        case "weather":    AudioServicesPlaySystemSound(1002)  // 提示音
-        case "search":     AudioServicesPlaySystemSound(1004)  // 搜索音
-        case "error":      AudioServicesPlaySystemSound(1053)  // 错误音
-        case "happy":      AudioServicesPlaySystemSound(1025)  // 欢快音
-        case "excited":    AudioServicesPlaySystemSound(1024)  // 惊喜音
-        case "surprised":  AudioServicesPlaySystemSound(1026)  // 惊讶音
-        case "dizzy":      AudioServicesPlaySystemSound(1052)  // 眩晕滴滴声
-        case "sad":        AudioServicesPlaySystemSound(1006)  // 低沉音
-        case "angry":      AudioServicesPlaySystemSound(1054)  // 警报音
-        case "love":       AudioServicesPlaySystemSound(1020)  // 温柔音
-        case "veryHappy":  AudioServicesPlaySystemSound(1031)  // 大笑音
-        default: break
+        // 优先用系统音效，静音模式下兜底用 AVAudioPlayer
+        if let id = exprConfig.soundID(for: name) {
+            AudioServicesPlaySystemSound(SystemSoundID(id))
+        }
+        // 异步播放自定义 beep，绕过静音开关
+        DispatchQueue.global().async {
+            Self.playBeep(name: name)
+        }
+    }
+    
+    // 自定义 beep 音，不受静音开关影响
+    private static var audioPlayer: AVAudioPlayer?
+    
+    private static func playBeep(name: String) {
+        let duration = 0.15
+        let sampleRate = 44100.0
+        let frequency: Double = {
+            switch name {
+            case "camera": return 800
+            case "error", "dizzy": return 400
+            case "happy", "excited", "veryHappy": return 1200
+            case "sad": return 300
+            default: return 800
+            }
+        }()
+        let samples = Int(duration * sampleRate)
+        let bytes = samples * 2
+        
+        // 构建完整 WAV（header + data 一起写入）
+        var data = Data(count: 44 + bytes)
+        data.withUnsafeMutableBytes { p in
+            let b = p.bindMemory(to: UInt8.self)
+            let w32 = { (offset: Int, value: UInt32) in
+                b[offset]   = UInt8(value & 0xff)
+                b[offset+1] = UInt8((value >> 8) & 0xff)
+                b[offset+2] = UInt8((value >> 16) & 0xff)
+                b[offset+3] = UInt8((value >> 24) & 0xff)
+            }
+            let w16 = { (offset: Int, value: UInt16) in
+                b[offset]   = UInt8(value & 0xff)
+                b[offset+1] = UInt8((value >> 8) & 0xff)
+            }
+            // RIFF
+            b[0]=0x52;b[1]=0x49;b[2]=0x46;b[3]=0x46
+            w32(4, UInt32(36 + bytes))
+            b[8]=0x57;b[9]=0x41;b[10]=0x56;b[11]=0x45
+            // fmt
+            b[12]=0x66;b[13]=0x6d;b[14]=0x74;b[15]=0x20
+            w32(16, 16); w16(20, 1); w16(22, 1)
+            w32(24, UInt32(sampleRate))
+            w32(28, UInt32(sampleRate * 2))
+            w16(32, 2); w16(34, 16)
+            // data chunk
+            b[36]=0x64;b[37]=0x61;b[38]=0x74;b[39]=0x61
+            w32(40, UInt32(bytes))
+            // samples (offset 44+)
+            let sb = p.bindMemory(to: Int16.self)
+            for i in 0..<samples {
+                let t = Double(i) / sampleRate
+                let env = 1.0 - t / duration
+                sb[22 + i] = Int16(sin(2 * .pi * frequency * t) * env * 8000)
+            }
+        }
+        
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("beep_\(name).wav")
+        try? data.write(to: tempURL)
+        
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default)
+        try? session.setActive(true)
+        audioPlayer = try? AVAudioPlayer(contentsOf: tempURL)
+        audioPlayer?.volume = 0.6
+        audioPlayer?.play()
+        
+        // 播放完后恢复录音会话
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+            let s = AVAudioSession.sharedInstance()
+            try? s.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try? s.setActive(true, options: .notifyOthersOnDeactivation)
         }
     }
     
     // MARK: - 说话期间表情循环
     
     private func startSpeakingCycle(_ baseEmotion: ExpressionType) {
-        let cluster = Self.emotionClusters[baseEmotion] ?? [.speaking, .normal, .speaking]
-        speakingCycle = cluster
+        let names = exprConfig.cluster(for: baseEmotion.rawValue)
+        speakingCycle = names.compactMap { ExpressionType(rawValue: $0) }
         speakingCycleIndex = 0
         speakingCycleTimer?.cancel()
         speakingCycleTimer = Timer.publish(every: 3.0, on: .main, in: .common)
@@ -593,23 +819,10 @@ class ChatViewModel: ObservableObject {
     // MARK: - 情绪检测
     
     private func detectEmotion(_ text: String) -> ExpressionType {
-        let t = text.lowercased()
-        if t.contains("哈哈") || t.contains("笑死") || t.contains("🤣") || t.contains("hhh") || t.contains("太好笑") { return .veryHappy }
-        if t.contains("开心") || t.contains("太棒") || t.contains("真好") || t.contains("😄") || t.contains("嘿嘿") || t.contains("耶") || t.contains("太好了") { return .happy }
-        if t.contains("哇") || t.contains("🤩") || t.contains("厉害") || t.contains("牛") || t.contains("太酷") || t.contains("天啊") || t.contains("太强") || t.contains("绝了") { return .excited }
-        if t.contains("什么") || t.contains("真的假的") || t.contains("😲") || t.contains("不会吧") || t.contains("居然") || t.contains("我的天") || t.contains("难以置信") { return .surprised }
-        if t.contains("害怕") || t.contains("恐怖") || t.contains("😨") || t.contains("吓") || t.contains("可怕") || t.contains("好怕") { return .scared }
-        if t.contains("生气") || t.contains("烦") || t.contains("😠") || t.contains("讨厌") || t.contains("滚") || t.contains("无语") || t.contains("愤怒") { return .angry }
-        if t.contains("难过") || t.contains("伤心") || t.contains("😢") || t.contains("哭") || t.contains("可惜") || t.contains("遗憾") || t.contains("心痛") { return .sad }
-        if t.contains("无聊") || t.contains("😑") || t.contains("没意思") || t.contains("好闲") || t.contains("闷") { return .bored }
-        if t.contains("爱你") || t.contains("喜欢") || t.contains("🥰") || t.contains("亲亲") || t.contains("么么") || t.contains("爱你哟") { return .love }
-        if t.contains("害羞") || t.contains("😳") || t.contains("不好意思") || t.contains("脸红") || t.contains("羞") { return .shy }
-        if t.contains("🤔") || t.contains("不太确定") || t.contains("奇怪") || t.contains("搞不懂") || t.contains("？？") || t.contains("不明白") { return .confused }
-        if t.contains("🤨") || t.contains("骗人") || t.contains("真的吗") || t.contains("不信") || t.contains("怀疑") { return .suspicious }
-        if t.contains("专注") || t.contains("分析") || t.contains("计算") || t.contains("查一下") || t.contains("搜索") { return .focused }
-        if t.contains("😉") || t.contains("悄悄") || t.contains("秘密") || t.contains("嘿") || t.contains("嘘") { return .wink }
-        if t.contains("😎") || t.contains("帅") || t.contains("酷") { return .cool }
-        if t.contains("😴") || t.contains("困") || t.contains("累了") || t.contains("好累") { return .sleepy }
+        if let name = exprConfig.detectEmotion(from: text),
+           let expr = ExpressionType(rawValue: name) {
+            return expr
+        }
         return .speaking
     }
     

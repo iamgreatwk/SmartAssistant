@@ -1,0 +1,229 @@
+{
+  "moods": {
+    "normal":     { "eyeW": 70, "eyeH": 58, "br": 24, "sb": 20, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "happy":      { "eyeW": 64, "eyeH": 50, "br": 22, "sb": 22, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.48, "rH": 0.48, "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "veryHappy":  { "eyeW": 56, "eyeH": 46, "br": 26, "sb": 24, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.60, "rH": 0.60, "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "sad":        { "eyeW": 64, "eyeH": 50, "br": 22, "sb": 26, "lT": 0.25, "rT": 0.25, "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 4  },
+    "angry":      { "eyeW": 68, "eyeH": 56, "br": 18, "sb": 18, "lT": 0,    "rT": 0,    "lA": 0.5,  "rA": 0.5,  "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "surprised":  { "eyeW": 78, "eyeH": 72, "br": 32, "sb": 16, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "thinking":   { "eyeW": 62, "eyeH": 48, "br": 16, "sb": 14, "lT": 0,    "rT": 0,    "lA": 0.15, "rA": 0.15, "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "listening":  { "eyeW": 74, "eyeH": 62, "br": 26, "sb": 18, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "speaking":   { "eyeW": 70, "eyeH": 58, "br": 24, "sb": 20, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "sleepy":     { "eyeW": 68, "eyeH": 28, "br": 12, "sb": 24, "lT": 0.65, "rT": 0.65, "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 6  },
+    "wink":       { "eyeW": 70, "eyeH": 58, "br": 24, "sb": 20, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.3,  "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 0.08, "yo": 0  },
+    "love":       { "eyeW": 56, "eyeH": 56, "br": 28, "sb": 24, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.55, "rH": 0.55, "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "confused":   { "eyeW": 70, "eyeH": 62, "br": 22, "sb": 20, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 0.65, "yo": -8 },
+    "cool":       { "eyeW": 66, "eyeH": 52, "br": 22, "sb": 22, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.2,  "rH": 0.2,  "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": -6 },
+    "shy":        { "eyeW": 56, "eyeH": 56, "br": 26, "sb": 24, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.4,  "rH": 0.4,  "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "excited":    { "eyeW": 76, "eyeH": 68, "br": 30, "sb": 16, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0.35, "rH": 0.35, "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "scared":     { "eyeW": 52, "eyeH": 46, "br": 18, "sb": 36, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": -2 },
+    "bored":      { "eyeW": 70, "eyeH": 44, "br": 12, "sb": 24, "lT": 0,    "rT": 0,    "lA": 0,    "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0.35, "rF": 0.35, "lM": 1,    "rM": 1,    "yo": 2  },
+    "focused":    { "eyeW": 62, "eyeH": 48, "br": 16, "sb": 14, "lT": 0,    "rT": 0,    "lA": 0.15, "rA": 0.15, "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 1,    "yo": 0  },
+    "suspicious": { "eyeW": 68, "eyeH": 56, "br": 20, "sb": 20, "lT": 0,    "rT": 0,    "lA": 0.45, "rA": 0,    "lH": 0,    "rH": 0,    "lF": 0,    "rF": 0,    "lM": 1,    "rM": 0.85, "yo": 0  }
+  },
+  "emotionKeywords": {
+    "veryHappy":  ["哈哈", "笑死", "🤣", "hhh", "太好笑"],
+    "happy":      ["开心", "太棒", "真好", "😄", "嘿嘿", "耶", "太好了"],
+    "excited":    ["哇", "🤩", "厉害", "牛", "太酷", "天啊", "太强", "绝了"],
+    "surprised":  ["什么", "真的假的", "😲", "不会吧", "居然", "我的天", "难以置信"],
+    "scared":     ["害怕", "恐怖", "😨", "吓", "可怕", "好怕"],
+    "angry":      ["生气", "烦", "😠", "讨厌", "滚", "无语", "愤怒"],
+    "sad":        ["难过", "伤心", "😢", "哭", "可惜", "遗憾", "心痛"],
+    "bored":      ["无聊", "😑", "没意思", "好闲", "闷"],
+    "love":       ["爱你", "喜欢", "🥰", "亲亲", "么么", "爱你哟"],
+    "shy":        ["害羞", "😳", "不好意思", "脸红", "羞"],
+    "confused":   ["🤔", "不太确定", "奇怪", "搞不懂", "？？", "不明白"],
+    "suspicious": ["🤨", "骗人", "真的吗", "不信", "怀疑"],
+    "focused":    ["专注", "分析", "计算", "查一下", "搜索"],
+    "wink":       ["😉", "悄悄", "秘密", "嘿", "嘘"],
+    "cool":       ["😎", "帅", "酷"],
+    "sleepy":     ["😴", "困", "累了", "好累"]
+  },
+  "emotionClusters": {
+    "happy":      ["happy", "veryHappy", "happy", "love", "wink", "happy"],
+    "veryHappy":  ["veryHappy", "happy", "love", "excited", "veryHappy"],
+    "excited":    ["excited", "surprised", "happy", "excited", "love", "happy"],
+    "surprised":  ["surprised", "excited", "surprised", "scared", "surprised"],
+    "sad":        ["sad", "sleepy", "sad", "confused", "sad", "normal"],
+    "angry":      ["angry", "suspicious", "angry", "scared", "angry"],
+    "scared":     ["scared", "surprised", "sad", "scared", "normal"],
+    "confused":   ["confused", "thinking", "suspicious", "confused", "thinking"],
+    "love":       ["love", "shy", "love", "happy", "love", "wink"],
+    "sleepy":     ["sleepy", "sad", "normal", "sleepy"],
+    "focused":    ["focused", "thinking", "focused", "cool", "focused"],
+    "thinking":   ["thinking", "focused", "thinking", "confused", "thinking"],
+    "cool":       ["cool", "normal", "cool", "happy", "cool"],
+    "shy":        ["shy", "love", "shy", "happy", "shy"],
+    "suspicious": ["suspicious", "confused", "thinking", "suspicious"],
+    "bored":      ["bored", "sleepy", "normal", "bored"],
+    "wink":       ["wink", "happy", "normal", "wink"],
+    "speaking":   ["speaking", "normal", "listening", "thinking", "speaking"],
+    "normal":     ["normal", "listening", "thinking", "focused", "normal"]
+  },
+  "emotionToSequence": {
+    "veryHappy": "excited",
+    "excited":   "excited",
+    "surprised": "surprise",
+    "scared":    "surprise",
+    "angry":     "error",
+    "sad":       "sadness",
+    "focused":   "thinking",
+    "thinking":  "thinking",
+    "love":      "excited",
+    "sleepy":    "sleepySeq",
+    "confused":  "curious",
+    "suspicious":"curious"
+  },
+  "sequences": {
+    "greeting": [
+      { "e": "surprised" },
+      { "e": "surprised", "y": -0.4 },
+      { "e": "happy" },
+      { "e": "happy", "x": 0.4 },
+      { "e": "happy", "x": -0.4 },
+      { "e": "happy" },
+      { "e": "normal" }
+    ],
+    "surprise": [
+      { "e": "surprised", "y": -0.5 },
+      { "e": "surprised" },
+      { "e": "scared", "b": true },
+      { "e": "surprised", "b": true },
+      { "e": "surprised" },
+      { "e": "normal" }
+    ],
+    "thinking": [
+      { "e": "focused", "y": -0.5 },
+      { "e": "focused", "x": -0.4 },
+      { "e": "focused", "x": 0.4 },
+      { "e": "wink" },
+      { "e": "normal" }
+    ],
+    "error": [
+      { "e": "surprised" },
+      { "e": "scared" },
+      { "e": "angry" },
+      { "e": "sad", "y": 0.4, "b": true },
+      { "e": "sad" },
+      { "e": "normal" }
+    ],
+    "sadness": [
+      { "e": "normal", "y": 0.3 },
+      { "e": "sad" },
+      { "e": "sleepy", "b": true },
+      { "e": "sad" },
+      { "e": "normal" }
+    ],
+    "curious": [
+      { "e": "normal", "x": -0.5 },
+      { "e": "normal", "x": 0.5 },
+      { "e": "normal", "y": -0.4 },
+      { "e": "surprised", "y": 0.3 },
+      { "e": "focused" },
+      { "e": "normal" }
+    ],
+    "sleepySeq": [
+      { "e": "normal" },
+      { "e": "sleepy" },
+      { "e": "sleepy", "b": true },
+      { "e": "sleepy", "b": true },
+      { "e": "sleepy" }
+    ],
+    "excited": [
+      { "e": "surprised", "y": -0.5 },
+      { "e": "happy" },
+      { "e": "happy", "x": -0.5 },
+      { "e": "happy", "x": 0.5 },
+      { "e": "happy", "y": -0.4 },
+      { "e": "happy", "y": 0.3 },
+      { "e": "happy", "b": true },
+      { "e": "love" },
+      { "e": "happy" },
+      { "e": "normal" }
+    ]
+  },
+  "petEmpathy": {
+    "sad":        "sad",
+    "angry":      "scared",
+    "scared":     "scared",
+    "happy":      "happy",
+    "excited":    "excited",
+    "love":       "love",
+    "bored":      "normal",
+    "sleepy":     "sleepy",
+    "confused":   "confused",
+    "suspicious": "suspicious"
+  },
+  "commands": {
+    "拍照":   { "e": "excited", "c": "camera" },
+    "相机":   { "e": "excited", "c": "camera" },
+    "拍张照": { "e": "excited", "c": "camera" },
+    "咔嚓":   { "e": "excited", "c": "camera" },
+    "天气":   { "e": "focused", "c": "weather" },
+    "气温":   { "e": "focused", "c": "weather" },
+    "多少度": { "e": "focused", "c": "weather" },
+    "搜索":   { "e": "focused", "c": "search" },
+    "查一下": { "e": "focused", "c": "search" },
+    "帮我查": { "e": "focused", "c": "search" }
+  },
+  "soundMap": {
+    "camera":    1108,
+    "weather":   1002,
+    "search":    1004,
+    "error":     1053,
+    "happy":     1025,
+    "excited":   1024,
+    "surprised": 1026,
+    "sad":       1006,
+    "angry":     1054,
+    "love":      1020,
+    "veryHappy": 1031,
+    "dizzy":     1052
+  },
+  "idleExpressions": [
+    "normal", "cool", "happy", "thinking", "wink",
+    "focused", "normal", "shy", "listening", "normal"
+  ],
+  "listeningExpressions": ["listening", "focused", "listening", "thinking"],
+  "thinkingExpressions": ["thinking", "focused", "confused", "suspicious"],
+  "negativeEmotions": ["sad", "angry", "scared", "bored", "sleepy", "confused"],
+  "shakeThreshold": 2.5,
+  "shakeSpikeCount": 3,
+  "shakeDizzySeconds": 3,
+  "knockRecoverSeconds": 0.6,
+  "sensorTriggers": {
+    "upsideDown":    { "e": "surprised", "s": "surprised", "t": 2.5, "pitch": -35 },
+    "tilted":        { "e": "confused",  "s": null,        "t": 2.0, "roll": 35 },
+    "fastSpin":      { "e": "confused",  "s": "dizzy",     "t": 3.0, "gyroRate": 300 },
+    "fastMoving":    { "e": "excited",   "s": "happy",     "t": 3.0, "speedKmh": 15 },
+    "freeFall":      { "e": "scared",    "s": "surprised", "t": 3.0, "accelBelow": 0.3 },
+    "stillLong":     { "e": "sleepy",    "s": null,        "t": 4.0, "stillSeconds": 60 },
+    "lightDark":     { "e": "sleepy",    "s": null,        "t": 4.0, "luxBelow": 10 },
+    "altitudeUp":    { "e": "surprised", "s": "surprised", "t": 3.0, "altChange": 3.0 },
+    "altitudeDown":  { "e": "scared",    "s": "surprised", "t": 3.0, "altChange": -3.0 },
+    "walking":       { "e": "happy",     "s": null,        "t": 3.0, "stepsPerMin": 60 },
+    "faceClose":     { "e": "shy",       "s": "happy",     "t": 2.0, "proximity": true },
+    "hotTemp":       { "e": "angry",     "s": "angry",     "t": 4.0, "tempAbove": 35 },
+    "pickedUp":     { "e": "surprised", "s": "surprised", "t": 3.0, "accelBelow": 0.6, "proximity": false, "roll": 10 }
+  },
+  "camera": {
+    "enabled": true,
+    "autoCapture": true,
+    "captureDelaySec": 0.8,
+    "modes": ["photo", "face", "object", "gesture"],
+    "defaultMode": "photo",
+    "commands": {
+      "拍照": { "mode": "photo", "e": "excited", "s": "camera" },
+      "自拍": { "mode": "photo", "e": "happy", "s": "camera" },
+      "人脸": { "mode": "face", "e": "focused", "s": null },
+      "看看你是谁": { "mode": "face", "e": "surprised", "s": null },
+      "这是什么": { "mode": "object", "e": "focused", "s": null },
+      "识别一下": { "mode": "object", "e": "focused", "s": null }
+    },
+    "faceTriggers": {
+      "found": { "e": "surprised", "s": "happy", "t": 3.0 },
+      "none": { "e": "sad", "s": "sad", "t": 2.0 },
+      "known": { "e": "love", "s": "love", "t": 5.0 }
+    }
+  }
+}
