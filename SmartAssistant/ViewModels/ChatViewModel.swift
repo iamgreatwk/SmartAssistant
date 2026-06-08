@@ -65,7 +65,6 @@ class ChatViewModel: ObservableObject {
     // MARK: - 调试日志
     
     private func logDebug(_ keypath: WritableKeyPath<DebugInfo, String>, _ value: String) {
-        guard self.config.debugMode else { return }
         debugInfo[keyPath: keypath] = value
     }
     
