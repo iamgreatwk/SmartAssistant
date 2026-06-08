@@ -74,6 +74,7 @@ struct ContentView: View {
             guard !hasAutoStarted else { return }
             hasAutoStarted = true
             sensorVM.startAllSensors()
+            chatVM.refreshBalance()
             Task {
                 await permissionManager.requestAllPermissions()
                 try? await Task.sleep(for: .milliseconds(500))
@@ -157,16 +158,20 @@ struct ContentView: View {
         HStack {
             Spacer()
             VStack(alignment: .leading, spacing: 1) {
-                Text("🔊 \(chatVM.debugInfo.sttText)")
-                Text("📤 \(chatVM.debugInfo.aiInput)")
-                Text("📥 \(chatVM.debugInfo.aiOutput)")
-                Text("😊 \(chatVM.debugInfo.expression)")
-                Text("🔄 \(chatVM.debugInfo.workflow)")
-                Text("🔢 \(chatVM.debugInfo.tokens) tokens")
+                Text("识别: \(chatVM.debugInfo.sttText)")
+                Text("输入: \(chatVM.debugInfo.aiInput)")
+                Text("输出: \(chatVM.debugInfo.aiOutput)")
+                Text("表情: \(chatVM.debugInfo.expression)")
+                Text("状态: \(chatVM.debugInfo.workflow)")
+                Text("本次: \(chatVM.debugInfo.tokens)t  总计: \(chatVM.debugInfo.totalTokens)t")
+                if !chatVM.debugInfo.balance.isEmpty {
+                    Text("余额: ¥\(chatVM.debugInfo.balance)")
+                }
             }
             .font(.system(size: 9, design: .monospaced))
             .foregroundColor(.green.opacity(0.7))
             .padding(8)
+            .frame(maxWidth: width * 0.45, alignment: .leading)
             .background(.black.opacity(0.85))
             .cornerRadius(8)
             .padding(.trailing, 8)

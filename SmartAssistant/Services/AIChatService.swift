@@ -144,6 +144,28 @@ class AIChatService: ObservableObject {
         }
     }
     
+    // MARK: - 查询余额
+    
+    func fetchBalance() async throws -> BalanceInfo {
+        guard let url = URL(string: config.balanceApiEndpoint) else {
+            throw ChatError.invalidURL
+        }
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "GET"
+        urlRequest.addValue("Bearer \(config.aiApiKey)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await urlSession.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw ChatError.invalidResponse
+        }
+        
+        struct UserInfoResponse: Codable {
+            let data: BalanceInfo
+        }
+        let info = try JSONDecoder().decode(UserInfoResponse.self, from: data)
+        return info.data
+    }
+    
     // MARK: - 获取对话历史
     
     var historyCount: Int {

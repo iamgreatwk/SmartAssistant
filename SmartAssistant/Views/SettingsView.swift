@@ -76,6 +76,15 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    
+                    HStack {
+                        Text("余额查询 API")
+                        Spacer()
+                        TextField("https://api.siliconflow.cn/v1/user/info", text: $config.balanceApiEndpoint)
+                            .multilineTextAlignment(.trailing)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 } header: {
                     Label("AI 对话配置", systemImage: "brain.head.profile")
                 } footer: {

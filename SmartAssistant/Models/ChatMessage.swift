@@ -96,12 +96,21 @@ struct TTSConfig {
     var postUtteranceDelay: TimeInterval = 0.03
 }
 
+// MARK: - 余额信息
+
+struct BalanceInfo: Codable {
+    let totalBalance: String
+    let chargeBalance: String
+    let balance: String
+}
+
 // MARK: - 应用配置
 
 struct AppConfig: Codable {
     var aiApiEndpoint: String = "https://api.siliconflow.cn/v1/chat/completions"
-    var aiApiKey: String = ""  // 请手动粘贴
+    var aiApiKey: String = ""
     var aiModel: String = "deepseek-ai/DeepSeek-V4-Flash"
+    var balanceApiEndpoint: String = "https://api.siliconflow.cn/v1/user/info"
     var systemPrompt: String = """
     你是桌面宠物机器人"小智"。只回复一个情绪词表示你此刻的心情。
     

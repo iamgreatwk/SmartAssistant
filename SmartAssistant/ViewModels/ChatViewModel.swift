@@ -48,6 +48,8 @@ class ChatViewModel: ObservableObject {
         var expression: String = ""
         var workflow: String = "空闲"
         var tokens: Int = 0
+        var totalTokens: Int = 0
+        var balance: String = ""
     }
     
     // 情绪感知
@@ -314,7 +316,7 @@ class ChatViewModel: ObservableObject {
             conversationState = .listening
             currentExpression = .listening
             lookX = 0; lookY = -0.2
-            logDebug(\.workflow, "🎧 聆听中")
+            logDebug(\.workflow, "聆听中")
         } catch {}
     }
     
@@ -337,7 +339,7 @@ class ChatViewModel: ObservableObject {
         recentMoods.append(detectedMood)
         if recentMoods.count > 10 { recentMoods.removeFirst() }
         
-        logDebug(\.workflow, "🧠 思考中...")
+        logDebug(\.workflow, "思考中...")
         logDebug(\.sttText, trimmed)
         logDebug(\.aiInput, trimmed)
         logDebug(\.aiOutput, "等待AI...")
@@ -370,12 +372,14 @@ class ChatViewModel: ObservableObject {
             let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
             debugInfo.tokens = tokens
+            debugInfo.totalTokens += tokens
             let aiEmotion = parseEmotion(response)
             logDebug(\.aiOutput, response)
             logDebug(\.expression, aiEmotion.displayName)
-            logDebug(\.workflow, "🎭 表情: \(aiEmotion.displayName)")
+            logDebug(\.workflow, "表情: \(aiEmotion.displayName)")
             messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
             respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
+            refreshBalance()
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
@@ -420,12 +424,14 @@ class ChatViewModel: ObservableObject {
             let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
             isProcessing = false
             debugInfo.tokens = tokens
+            debugInfo.totalTokens += tokens
             let aiEmotion = parseEmotion(response)
             logDebug(\.aiOutput, response)
             logDebug(\.expression, aiEmotion.displayName)
-            logDebug(\.workflow, "🎭 表情: \(aiEmotion.displayName)")
+            logDebug(\.workflow, "表情: \(aiEmotion.displayName)")
             messages.append(ChatMessage(role: .assistant, content: response, expression: aiEmotion))
             respondLikePet(userMood: detectedMood, aiEmotion: aiEmotion)
+            refreshBalance()
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
@@ -797,6 +803,15 @@ class ChatViewModel: ObservableObject {
     }
     
     func getConfig() -> AppConfig { return config }
+    
+    func refreshBalance() {
+        guard config.debugMode else { return }
+        Task {
+            if let info = try? await aiService.fetchBalance() {
+                debugInfo.balance = "\(info.totalBalance)"
+            }
+        }
+    }
 }
 
 extension Character {
