@@ -373,7 +373,6 @@ class ChatViewModel: ObservableObject {
             conversationState = .error(error.localizedDescription)
             logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
             logDebug(\.workflow, "请求失败")
-            let el = exprConfig.look(for: "error")
             if let errCfg = exprConfig.errorResponse,
                let errExpr = ExpressionType(rawValue: errCfg.expression) {
                 currentExpression = errExpr
@@ -412,9 +411,8 @@ class ChatViewModel: ObservableObject {
         isProcessing = true
         conversationState = .thinking
         currentExpression = .thinking
-        do {
-            let tl = exprConfig.look(for: "thinking")
-            lookX = tl.0; lookY = tl.1
+        let tl = exprConfig.look(for: "thinking")
+        lookX = tl.0; lookY = tl.1
         
         if let (expr, cmd) = detectCommand(trimmed) {
             isProcessing = false
@@ -445,7 +443,6 @@ class ChatViewModel: ObservableObject {
             conversationState = .error(error.localizedDescription)
             logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
             logDebug(\.workflow, "请求失败")
-            let el = exprConfig.look(for: "error")
             if let errCfg = exprConfig.errorResponse,
                let errExpr = ExpressionType(rawValue: errCfg.expression) {
                 currentExpression = errExpr
@@ -477,20 +474,6 @@ class ChatViewModel: ObservableObject {
     }
     
     // MARK: - 宠物回应（感知情绪 + AI 推理 → 表情）
-    
-    /// 情绪互补映射：用户难过 → 宠物安慰，用户开心 → 宠物更开心
-    static let petEmpathy: [ExpressionType: ExpressionType] = [
-        .sad: .sad,         // 你难过，我也难过
-        .angry: .scared,    // 你生气，我害怕
-        .scared: .scared,   // 你害怕，我陪你害怕
-        .happy: .happy,     // 你开心，我也开心
-        .excited: .excited, // 你兴奋，我更兴奋
-        .love: .love,       // 你喜欢我，我也喜欢你
-        .bored: .normal,    // 你无聊，我来逗你
-        .sleepy: .sleepy,   // 你困了，我也困
-        .confused: .confused,
-        .suspicious: .suspicious,
-    ]
     
     private func respondLikePet(userMood: ExpressionType, aiEmotion: ExpressionType) {
         conversationState = .speaking

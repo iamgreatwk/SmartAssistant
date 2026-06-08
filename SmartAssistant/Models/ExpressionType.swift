@@ -3,7 +3,7 @@ import Foundation
 /// 小智表情类型 — 基于 RoboEyes 算法
 /// 眼睛：填充圆角矩形 + 三角形/矩形眼皮遮盖
 /// 嘴巴：8 种嘴型（保持不变）
-enum ExpressionType: Codable {
+enum ExpressionType: Codable, Hashable {
     case normal     // 正常
     case happy      // 开心
     case veryHappy  // 非常开心
@@ -81,6 +81,7 @@ enum ExpressionType: Codable {
         case .bored: return "无聊"
         case .focused: return "专注"
         case .suspicious: return "怀疑"
+        case .custom(let name): return name
         }
     }
 
@@ -107,6 +108,7 @@ enum ExpressionType: Codable {
         case .bored: return "😑"
         case .focused: return "🧐"
         case .suspicious: return "🤨"
+        case .custom: return "❓"
         }
     }
 
