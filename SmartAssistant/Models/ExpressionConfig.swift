@@ -157,13 +157,37 @@ struct ExpressionConfig: Codable {
         }
         
         // 2. 回退到 Bundle 内置版本
-        guard let url = Bundle.main.url(forResource: "expressions", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let config = try? JSONDecoder().decode(ExpressionConfig.self, from: data) else {
-            fatalError("无法加载 expressions.json")
+        if let url = Bundle.main.url(forResource: "expressions", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let config = try? JSONDecoder().decode(ExpressionConfig.self, from: data) {
+            return config
         }
-        return config
+        
+        // 3. 最终兜底：内置默认配置（不依赖 JSON 文件）
+        print("⚠️ 无法加载 expressions.json，使用内置默认配置")
+        return ExpressionConfig.defaultConfig
     }()
+    
+    // MARK: - 内置默认配置（JSON 缺失时的兜底）
+    
+    private static let defaultConfig = ExpressionConfig(
+        moods: ["normal": MoodConfig(eyeW: 70, eyeH: 58, br: 24, sb: 20, lT: 0, rT: 0, lA: 0, rA: 0, lH: 0, rH: 0, lF: 0, rF: 0, lM: 1, rM: 1, yo: 0)],
+        emotionKeywords: ["happy": ["开心"]],
+        emotionClusters: ["speaking": ["normal", "speaking"]],
+        emotionToSequence: [:],
+        sequences: [:],
+        petEmpathy: [:],
+        commands: [:],
+        soundMap: [:],
+        idleExpressions: ["normal"],
+        listeningExpressions: ["normal"],
+        thinkingExpressions: ["normal"],
+        negativeEmotions: ["sad"],
+        shake: ShakeConfig(e: "confused", s: "dizzy"),
+        knock: KnockConfig(e: "surprised", s: "happy", lx: 0, ly: -0.4),
+        sensorTriggers: [:],
+        camera: CameraConfig(enabled: true, autoCapture: true, captureDelaySec: 0.8, modes: ["photo"], defaultMode: "photo", commands: [:], faceTriggers: [:])
+    )
     
     // MARK: - 查询方法
     

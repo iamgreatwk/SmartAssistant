@@ -136,18 +136,14 @@ struct SettingsView: View {
                 // MARK: - 传感器控制
                 Section {
                     Button {
-                        if sensorVM.sensorsRunning {
-                            sensorVM.stopAllSensors()
-                        } else {
-                            sensorVM.startAllSensors()
-                        }
+                        // 传感器由 ChatViewModel 统一管理
+                        chatVM.startServices()
                     } label: {
                         HStack {
-                            Label(sensorVM.sensorsRunning ? "传感器运行中" : "传感器已停止",
-                                  systemImage: sensorVM.sensorsRunning ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                            Label("重新启动传感器", systemImage: "antenna.radiowaves.left.and.right")
                             Spacer()
                             Circle()
-                                .fill(sensorVM.sensorsRunning ? Color.green : Color.gray)
+                                .fill(Color.green)
                                 .frame(width: 10, height: 10)
                         }
                     }

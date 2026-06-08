@@ -73,7 +73,8 @@ struct ContentView: View {
         .onAppear {
             guard !hasAutoStarted else { return }
             hasAutoStarted = true
-            sensorVM.startAllSensors()
+            // 先启动传感器服务（通过 ChatViewModel 统一管理，避免双实例竞争）
+            chatVM.startServices()
             chatVM.refreshBalance()
             Task {
                 await permissionManager.requestAllPermissions()

@@ -102,12 +102,15 @@ class ChatViewModel: ObservableObject {
     init() {
         self.config = .load()
         setupBindings()
+    }
+    
+    /// 启动所有硬件传感器（在 View 的 onAppear 中调用，避免 init 时过早启动导致闪退）
+    func startServices() {
         motionService.startAccelerometer()
         motionService.startGyroscope()
         motionService.startDeviceMotion()
         motionService.startPedometer()
         locationService.startUpdatingLocation()
-        // 距离传感器
         UIDevice.current.isProximityMonitoringEnabled = true
     }
     

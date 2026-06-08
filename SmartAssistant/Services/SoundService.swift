@@ -12,15 +12,14 @@ class SoundService {
     }
     
     private func configureSession() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-        } catch {
-            print("SoundService: 音频会话配置失败")
-        }
+        // 不覆盖 AppDelegate 设置的 .playAndRecord 类别
+        // AVAudioSession 已在 AppDelegate 中配置好
     }
-    
+
     /// 播放指定名称的音效（优先音频文件，无文件用 beep 兜底）
     func play(_ name: String, filename: String? = nil) {
+        // 确保音频会话激活（AppDelegate 已设好 category）
+        try? AVAudioSession.sharedInstance().setActive(true)
         let file = filename ?? name
         
         // 1. 尝试从 Bundle 加载音频文件
