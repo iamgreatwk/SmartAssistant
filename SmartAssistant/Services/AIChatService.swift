@@ -108,7 +108,8 @@ class AIChatService: ObservableObject {
         }
         
         let chatResponse = try JSONDecoder().decode(ChatResponse.self, from: data)
-        guard let content = chatResponse.choices.first?.message.content else {
+        guard let content = chatResponse.choices.first?.message.content,
+              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw ChatError.emptyResponse
         }
         

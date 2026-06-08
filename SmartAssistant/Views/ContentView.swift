@@ -155,8 +155,7 @@ struct ContentView: View {
     }
     
     private func debugOverlay(width: CGFloat) -> some View {
-        HStack {
-            Spacer()
+        VStack(alignment: .trailing, spacing: 0) {
             VStack(alignment: .leading, spacing: 1) {
                 Text("识别: \(chatVM.debugInfo.sttText)")
                 Text("输入: \(chatVM.debugInfo.aiInput)")
@@ -171,11 +170,12 @@ struct ContentView: View {
             .font(.system(size: 9, design: .monospaced))
             .foregroundColor(.green.opacity(0.7))
             .padding(8)
-            .frame(maxWidth: width * 0.45, alignment: .leading)
+            .frame(maxWidth: width * 0.42, alignment: .leading)
             .background(.black.opacity(0.85))
             .cornerRadius(8)
-            .padding(.trailing, 8)
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.trailing, 8)
     }
     
     private func handleTap() {}

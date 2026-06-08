@@ -383,6 +383,8 @@ class ChatViewModel: ObservableObject {
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
+            logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
+            logDebug(\.workflow, "请求失败")
             currentExpression = .sad; lookX = 0; lookY = 0.2
             if !isPlayingSequence { playSequence("error") }
             playSound("error")
@@ -435,6 +437,8 @@ class ChatViewModel: ObservableObject {
         } catch {
             isProcessing = false
             conversationState = .error(error.localizedDescription)
+            logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
+            logDebug(\.workflow, "请求失败")
             currentExpression = .sad; lookX = 0; lookY = 0.2
             if !isPlayingSequence { playSequence("error") }
             playSound("error")
