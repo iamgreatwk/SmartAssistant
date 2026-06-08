@@ -94,6 +94,7 @@
   <button onclick="fetchBalance()">查余额</button>
   <span id="balance">--</span>
   <button class="danger" onclick="clearChat()">清空对话</button>
+  <select id="soundTest" style="background:var(--bg);color:var(--text);border:1px solid var(--border);font-size:11px;padding:3px;border-radius:3px;max-width:100px" onchange="if(this.value)testSound(this.value)"><option value="">▶ 音效</option></select>
   <label style="cursor:pointer" title="加载iOS的expressions.json">
     <input type="file" id="jsonFile" accept=".json" style="display:none" onchange="loadJSON(this)">📂 JSON
   </label>
@@ -210,12 +211,25 @@ function loadJSON(input){
       exprCfg.idleExpressions=json.idleExpressions||[];
       exprCfg.listeningExpressions=json.listeningExpressions||[];
       exprCfg.thinkingExpressions=json.thinkingExpressions||[];
+      exprCfg.shakeConfig=json.shakeConfig||{e:'confused',s:'dizzy'};
+      exprCfg.knockConfig=json.knockConfig||{e:'surprised',s:'happy',lx:0,ly:-0.4};
+      exprCfg.shakeThreshold=json.shakeThreshold||1.2;
+      exprCfg.shakeSpikeCount=json.shakeSpikeCount||2;
+      exprCfg.speakingDurationSec=json.speakingDurationSec||5.0;
+      exprCfg.commandDurationSec=json.commandDurationSec||3.0;
 
       // JSON moods 覆盖默认 MOODS
       Object.assign(MOODS, exprCfg.moods);
 
       // 重建传感器按钮
       rebuildSensors();
+
+      // 填充音效下拉
+      const sel=document.getElementById('soundTest');
+      sel.innerHTML='<option value="">▶ 音效</option>';
+      if(json.soundMap) for(const[k,v] of Object.entries(json.soundMap)){
+        sel.innerHTML+=`<option value="${k}">${k}</option>`;
+      }
 
       jsonLoaded=true;
       document.getElementById('jsonStatus').textContent='已加载 ('+file.name+')';
@@ -380,7 +394,7 @@ function simSensor(s){
   
   setMood(s.expr);
   if(s.seq) playSensorSequence(s.seq);
-  
+  autoPlaySound(s.expr);
   log(`[传感器] ${s.label} 触发 (${s.params.map(p=>p.key+'='+p.val).join(', ')}) → ${DISPLAY[s.expr]||s.expr}`,'info');
   
   sensorTimer=setTimeout(()=>{
@@ -544,6 +558,7 @@ function checkSensorTriggers(){
     // 触发第一个匹配的
     const f=fired[0];
     setMood(f.expr);
+    autoPlaySound(f.expr);
     if(sensorTimer){ clearTimeout(sensorTimer); sensorTimer=null; }
     sensorTimer=setTimeout(()=>{ setMood('normal'); },f.sec*1000);
     log(`[传感器模拟] 触发 ${fired.map(f=>f.id).join(', ')}`, 'info');
@@ -634,6 +649,28 @@ function addMsg(role, text, emotion){
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+let testAudio=null;
+function testSound(name){
+  if(testAudio){ testAudio.pause(); testAudio=null; }
+  const file=exprCfg.soundMap&&exprCfg.soundMap[name];
+  if(!file){ log(`音效 [${name}]: 无文件, beep 兜底`,'info'); return; }
+  testAudio=new Audio(file);
+  testAudio.volume=0.7;
+  testAudio.onerror=()=>{ log(`音效 [${name}]: 文件未找到 ${file}`,'error'); testAudio=null; };
+  testAudio.play().catch(()=>log(`音效 [${name}]: 播放失败`,'error'));
+    log(`▶ 播放音效: ${name} → ${file}`,'info');
+}
+
+// 静默播放音效（不记日志）
+function autoPlaySound(name){
+  if(testAudio){ testAudio.pause(); testAudio=null; }
+  const file=exprCfg.soundMap&&exprCfg.soundMap[name];
+  if(!file) return;
+  testAudio=new Audio(file);
+  testAudio.volume=0.7;
+  testAudio.play().catch(()=>{});
+}
+
 // ===== 空闲表情循环（模拟 iOS idle 行为）=====
 let idleExpressions=['normal','cool','happy','thinking','wink','focused','normal','shy','listening','normal'];
 let idleIndex=0, idleTimer=null, idleActive=true;
@@ -697,6 +734,7 @@ async function send(){
   const cmd=detectCommand(text);
   if(cmd){
     setMood(cmd.expr);
+    autoPlaySound(cmd.cmd||cmd.expr);
     startIdleCycle();
     log(`指令匹配: ${cmd.cmd} → ${cmd.expr}`);
     document.querySelector('#chatBox .msg.ai:last-child .bubble').textContent=`[指令: ${cmd.cmd}]`;
@@ -766,6 +804,7 @@ async function send(){
     
     const emotion=parseEmotion(aiText);
     setMood(emotion);
+    autoPlaySound(emotion);
     
     const last=document.querySelector('#chatBox .msg.ai:last-child');
     last.querySelector('.bubble').textContent=aiText||'(空)';

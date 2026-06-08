@@ -51,6 +51,8 @@ label{font-size:10px;color:#666}
     <div class="tab" onclick="switchTab('keyword')">🔤 关键词</div>
     <div class="tab" onclick="switchTab('seq')">🎬 序列</div>
     <div class="tab" onclick="switchTab('sensor')">📡 传感器</div>
+    <div class="tab" onclick="switchTab('sys')">⚙ 系统</div>
+    <div class="tab" onclick="switchTab('sound')">🔊 音效</div>
     <div class="tab" onclick="switchTab('cmd')">🎯 指令</div>
   </div>
 
@@ -116,6 +118,39 @@ label{font-size:10px;color:#666}
     <button onclick="saveTrigger()" style="margin-top:4px">💾 保存触发</button>
   </div>
 
+  <!-- === 系统参数 === -->
+  <div class="section" id="sec-sys">
+    <h2>摇晃/敲击</h2>
+    <div class="row"><div><label>摇晃表情</label><input id="sysShakeE"></div><div><label>音效</label><input id="sysShakeS"></div></div>
+    <div class="row"><div><label>敲击表情</label><input id="sysKnockE"></div><div><label>音效</label><input id="sysKnockS"></div></div>
+    <div class="row"><div><label>敲击视线X</label><input id="sysKnockLX" type="number" step="0.1"></div><div><label>视线Y</label><input id="sysKnockLY" type="number" step="0.1"></div></div>
+    <h2>时间参数</h2>
+    <div class="row"><div><label>摇晃阈值(g)</label><input id="sysShakeThr" type="number" step="0.1"></div><div><label>尖峰次数</label><input id="sysSpikeCnt" type="number" step="1"></div></div>
+    <div class="row"><div><label>眩晕(s)</label><input id="sysDizzySec" type="number" step="0.5"></div><div><label>敲击恢复(s)</label><input id="sysKnockSec" type="number" step="0.1"></div></div>
+    <div class="row"><div><label>说话持续(s)</label><input id="sysSpeakSec" type="number" step="0.5"></div><div><label>循环间隔(s)</label><input id="sysCycleSec" type="number" step="0.5"></div></div>
+    <div class="row"><div><label>指令持续(s)</label><input id="sysCmdSec" type="number" step="0.5"></div><div><label>错误恢复(s)</label><input id="sysErrSec" type="number" step="0.5"></div></div>
+    <div class="row"><div><label>轮询间隔(s)</label><input id="sysEnrichSec" type="number" step="0.1"></div></div>
+    <button onclick="saveSysConfig()" style="margin-top:4px">💾 保存系统配置</button>
+  </div>
+
+  <!-- === 音效管理 === -->
+  <div class="section" id="sec-sound">
+    <h2>音效文件映射</h2>
+    <div class="row" style="margin-bottom:4px">
+      <button onclick="addSoundRow()">+ 添加音效</button>
+      <button onclick="saveSoundMap()">💾 保存</button>
+    </div>
+    <div id="soundList"></div>
+    <h2 style="margin-top:6px">测试播放</h2>
+    <div class="row">
+      <select id="soundTestSelect" style="flex:1"></select>
+      <button onclick="playTestSound()">▶ 播放</button>
+      <button onclick="stopTestSound()">⏹ 停止</button>
+    </div>
+    <label style="margin-top:4px">或拖入音频文件测试:</label>
+    <input type="file" id="soundFileInput" accept="audio/*" onchange="previewSoundFile(this)" style="font-size:10px">
+  </div>
+
   <!-- === 指令 === -->
   <div class="section" id="sec-cmd">
     <h2>语音指令</h2>
@@ -140,11 +175,13 @@ let S={lxN:120,lyN:71,wN:70,hN:58,brN:24,sbN:20,lhN:58,rhN:58,lx:120,ly:71,w:70,
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  document.querySelector(`.tab:nth-child(${{face:1,keyword:2,seq:3,sensor:4,cmd:5}[t]})`).classList.add('active');
+  document.querySelector(`.tab:nth-child(${{face:1,keyword:2,seq:3,sensor:4,sys:5,sound:6,cmd:7}[t]})`).classList.add('active');
   document.getElementById(`sec-${t}`).classList.add('active');
   if(t==='keyword') refreshKwDropdown();
   if(t==='seq') refreshSeqDropdown();
   if(t==='sensor') refreshTriggerDropdown();
+  if(t==='sys') loadSysConfig();
+  if(t==='sound') renderSoundTab();
   if(t==='cmd') renderCommands();
 }
 
@@ -314,6 +351,93 @@ function addCommand(){
   saveCommands();
 }
 function saveCommands(){fullConfig.commands=cmdMap;renderCommands();}
+
+// === 系统配置 ===
+function loadSysConfig(){
+  if(!fullConfig) return;
+  const c=fullConfig;
+  document.getElementById('sysShakeE').value=(c.shakeConfig||{}).e||'confused';
+  document.getElementById('sysShakeS').value=(c.shakeConfig||{}).s||'dizzy';
+  document.getElementById('sysKnockE').value=(c.knockConfig||{}).e||'surprised';
+  document.getElementById('sysKnockS').value=(c.knockConfig||{}).s||'happy';
+  document.getElementById('sysKnockLX').value=(c.knockConfig||{}).lx||0;
+  document.getElementById('sysKnockLY').value=(c.knockConfig||{}).ly||-0.4;
+  document.getElementById('sysShakeThr').value=c.shakeThreshold||1.2;
+  document.getElementById('sysSpikeCnt').value=c.shakeSpikeCount||2;
+  document.getElementById('sysDizzySec').value=c.shakeDizzySeconds||3;
+  document.getElementById('sysKnockSec').value=c.knockRecoverSeconds||0.6;
+  document.getElementById('sysSpeakSec').value=c.speakingDurationSec||5;
+  document.getElementById('sysCycleSec').value=c.speakingCycleIntervalSec||3;
+  document.getElementById('sysCmdSec').value=c.commandDurationSec||3;
+  document.getElementById('sysErrSec').value=c.errorRecoverSec||4;
+  document.getElementById('sysEnrichSec').value=c.expressionEnrichIntervalSec||1.5;
+}
+function saveSysConfig(){
+  if(!fullConfig) return;
+  const c=fullConfig;
+  c.shakeConfig={e:document.getElementById('sysShakeE').value,s:document.getElementById('sysShakeS').value};
+  c.knockConfig={e:document.getElementById('sysKnockE').value,s:document.getElementById('sysKnockS').value,lx:parseFloat(document.getElementById('sysKnockLX').value)||0,ly:parseFloat(document.getElementById('sysKnockLY').value)||-0.4};
+  c.shakeThreshold=parseFloat(document.getElementById('sysShakeThr').value)||1.2;
+  c.shakeSpikeCount=parseInt(document.getElementById('sysSpikeCnt').value)||2;
+  c.shakeDizzySeconds=parseFloat(document.getElementById('sysDizzySec').value)||3;
+  c.knockRecoverSeconds=parseFloat(document.getElementById('sysKnockSec').value)||0.6;
+  c.speakingDurationSec=parseFloat(document.getElementById('sysSpeakSec').value)||5;
+  c.speakingCycleIntervalSec=parseFloat(document.getElementById('sysCycleSec').value)||3;
+  c.commandDurationSec=parseFloat(document.getElementById('sysCmdSec').value)||3;
+  c.errorRecoverSec=parseFloat(document.getElementById('sysErrSec').value)||4;
+  c.expressionEnrichIntervalSec=parseFloat(document.getElementById('sysEnrichSec').value)||1.5;
+  document.getElementById('status').textContent='✅ 系统配置已保存';
+}
+
+// === 音效管理 ===
+let soundMap={};
+function renderSoundTab(){
+  if(!fullConfig) return;
+  soundMap=fullConfig.soundMap||{};
+  const list=document.getElementById('soundList');
+  const sel=document.getElementById('soundTestSelect');
+  list.innerHTML=''; sel.innerHTML='';
+  for(const[k,v] of Object.entries(soundMap)){
+    list.innerHTML+=`<div class="kv-row">
+      <input value="${k}" onchange="updateSoundKey('${k}',this.value)" placeholder="名称">
+      <input value="${v}" onchange="soundMap['${k}']=this.value" placeholder="文件名 (如 dizzy.wav)">
+      <button onclick="deleteSound('${k}')" class="danger">✕</button></div>`;
+    sel.innerHTML+=`<option value="${k}">${k} → ${v||'(beep)'}</option>`;
+  }
+}
+function addSoundRow(){
+  const name=prompt('音效名称 (如 beep, happy):'); if(!name) return;
+  soundMap[name]=name+'.wav';
+  fullConfig.soundMap=soundMap;
+  renderSoundTab();
+}
+function updateSoundKey(oldKey,newKey){
+  if(!newKey||newKey===oldKey) return;
+  soundMap[newKey]=soundMap[oldKey]||'';
+  delete soundMap[oldKey];
+  fullConfig.soundMap=soundMap;
+}
+function deleteSound(name){ delete soundMap[name]; fullConfig.soundMap=soundMap; renderSoundTab(); }
+function saveSoundMap(){ fullConfig.soundMap=soundMap; document.getElementById('status').textContent='✅ 音效配置已保存'; }
+
+let testAudio=null;
+function playTestSound(){
+  if(testAudio){ testAudio.pause(); testAudio=null; }
+  const name=document.getElementById('soundTestSelect').value;
+  const file=soundMap[name];
+  if(!file){ alert('该音效无文件，使用 beep 兜底'); return; }
+  testAudio=new Audio(file);
+  testAudio.volume=0.7;
+  testAudio.onerror=()=>{ alert('文件未找到: '+file+' (需放在 HTML 同目录)'); testAudio=null; };
+  testAudio.play();
+}
+function stopTestSound(){ if(testAudio){ testAudio.pause(); testAudio=null; } }
+function previewSoundFile(input){
+  const file=input.files[0]; if(!file) return;
+  if(testAudio){ testAudio.pause(); }
+  testAudio=new Audio(URL.createObjectURL(file));
+  testAudio.volume=0.7; testAudio.play();
+}
 
 // === 渲染 ===
 function drawE(lx,ly,w,h,br,tired,angry,happy,flat,tag){

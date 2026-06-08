@@ -2,8 +2,6 @@ import Foundation
 import Combine
 import SwiftUI
 import UIKit
-import AudioToolbox
-import AVFoundation
 
 /// 聊天 ViewModel — 表情动画引擎（从 expressions.json 读取配置）
 @MainActor
@@ -175,34 +173,34 @@ class ChatViewModel: ObservableObject {
                     stepCount: self?.motionService.stepCount,
                     proximity: UIDevice.current.proximityState,
                     lux: UIScreen.main.brightness * 1000)
-                // 更新调试信息
+                // 更新调试信息 — 所有传感器值始终显示
                 if let d = data {
-                    let ax = d.x, ay = d.y, az = d.z
                     let mag = d.magnitude - 1.0
                     let gyro = self?.motionService.gyroscopeData
                     let gyroRate = gyro.map { sqrt($0.x*$0.x + $0.y*$0.y + $0.z*$0.z) } ?? 0
                     let att = self?.motionService.deviceAttitude
-                    let roll = att.map { abs($0.roll * 180 / .pi) < 10 ? "" : String(format:" R:%.0f°", $0.roll * 180 / .pi) } ?? ""
-                    let pitch = att.map { abs($0.pitch * 180 / .pi) < 10 ? "" : String(format:" P:%.0f°", $0.pitch * 180 / .pi) } ?? ""
-                    let yaw = att.map { abs($0.yaw * 180 / .pi) < 15 ? "" : String(format:" Y:%.0f°", $0.yaw * 180 / .pi) } ?? ""
+                    let rollDeg = att.map { $0.roll * 180 / .pi } ?? 0
+                    let pitchDeg = att.map { $0.pitch * 180 / .pi } ?? 0
+                    let yawDeg = att.map { $0.yaw * 180 / .pi } ?? 0
                     let magData = self?.motionService.magnetometerData
-                    let heading = magData.map { String(format:" 🧭%.0f°", atan2($0.y, $0.x) * 180 / .pi) } ?? ""
-                    let speed = (self?.locationService.currentLocation?.speedKMH).map { $0 > 2 ? String(format:" 🏃%.0fkm/h", $0) : "" } ?? ""
-                    let alt = (self?.locationService.currentLocation?.altitude).map { String(format:" %.0fm", $0) } ?? ""
-                    let steps = (self?.motionService.stepCount ?? 0) > 0 ? " 👣\(self?.motionService.stepCount ?? 0)" : ""
-                    let prox = UIDevice.current.proximityState ? " 近" : ""
-                    let brightness = UIScreen.main.brightness
-                    let light = brightness < 0.3 ? " 🌑" : brightness > 0.8 ? " ☀️" : ""
-                    let shake = abs(mag) > 0.8 ? " ⚡" : ""
-                    self?.debugInfo.sensor = String(format:"a:%.1fg%@ g:%.0f%@%@%@%@%@%@%@%@%@", mag, shake, gyroRate, roll, pitch, yaw, heading, speed, alt, steps, light, prox)
+                    let heading = magData.map { atan2($0.y, $0.x) * 180 / .pi } ?? 0
+                    let speedKmh = self?.locationService.currentLocation?.speedKMH ?? 0
+                    let alt = self?.locationService.currentLocation?.altitude ?? 0
+                    let stepsNow = self?.motionService.stepCount ?? 0
+                    let prox = UIDevice.current.proximityState
+                    let lux = Int(UIScreen.main.brightness * 1000)
+                    let shake = abs(mag) > 0.8
+                    
+                    let s1 = String(format:"a:%.1f%@ g:%.0f", mag, shake ? "⚡":"")
+                    let s2 = String(format:"R:%.0f P:%.0f Y:%.0f", rollDeg, pitchDeg, yawDeg)
+                    let s3 = String(format:"🧭%.0f° 🏃%.0f 👣%d", heading, speedKmh, stepsNow)
+                    let s4 = String(format:"H:%.0fm 💡%d%@", alt, lux, prox ? " 近":"")
+                    self?.debugInfo.sensor = "\(s1) \(s2)\n\(s3) \(s4)"
                 }
             }
             .store(in: &cancellables)
         $ttsConfig
             .sink { [weak self] config in self?.speaker.updateConfig(config) }
-            .store(in: &cancellables)
-        Timer.publish(every: exprConfig.expressionEnrichIntervalSec, on: .main, in: .common).autoconnect()
-            .sink { [weak self] _ in self?.enrichExpression() }
             .store(in: &cancellables)
     }
     
@@ -571,11 +569,12 @@ class ChatViewModel: ObservableObject {
             lastSpikeTime = now
             
             if spikeCount >= exprConfig.shakeSpikeCount {
-                // 连续 3 次尖峰 → 摇晃眩晕
                 if !isDizzy {
                     isDizzy = true
-                    currentExpression = .confused
-                    playSound("dizzy")
+                    if let expr = ExpressionType(rawValue: exprConfig.shakeConfig.e) {
+                        currentExpression = expr
+                    }
+                    playSound(exprConfig.shakeConfig.s)
                     spikeCount = 0
                     DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.shakeDizzySeconds) { [weak self] in
                         self?.isDizzy = false
@@ -583,12 +582,14 @@ class ChatViewModel: ObservableObject {
                     }
                 }
             } else if spikeCount == 1 {
-                // 单次尖峰 → 敲击反应
                 let saved = currentExpression
                 let savedX = lookX, savedY = lookY
-                currentExpression = .surprised
-                lookX = 0; lookY = -0.4
-                playSound("happy")
+                let kc = exprConfig.knockConfig
+                if let expr = ExpressionType(rawValue: kc.e) {
+                    currentExpression = expr
+                }
+                lookX = kc.lx ?? 0; lookY = kc.ly ?? -0.4
+                playSound(kc.s)
                 DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.knockRecoverSeconds) { [weak self] in
                     if self?.currentExpression == .surprised {
                         self?.currentExpression = saved
@@ -602,6 +603,8 @@ class ChatViewModel: ObservableObject {
     // MARK: - 传感器触发系统
     
     private var lastTriggerTime: [String: Date] = [:]
+    private var lastAnyTriggerTime: Date?
+    private var lastTriggerDuration: Double?
     private var stillSince: Date?
     private var lastAltitude: Double?
     private var lastStepCount: Int = 0
@@ -619,6 +622,10 @@ class ChatViewModel: ObservableObject {
                                lux: Double? = nil) {
         guard !isPlayingSequence, !isDizzy else { return }
         let now = Date()
+        
+        // 全局冷却：上一个传感器表情结束前不触发新的
+        if let lastAny = lastAnyTriggerTime, let lastDuration = lastTriggerDuration,
+           now.timeIntervalSince(lastAny) < lastDuration { return }
         
         // 读取 JSON 配置列表中每一项来检测
         let triggers = exprConfig.sensorTriggers
@@ -670,6 +677,8 @@ class ChatViewModel: ObservableObject {
             
             if triggered {
                 lastTriggerTime[triggerName] = now
+                lastAnyTriggerTime = now
+                lastTriggerDuration = cfg.t
                 if let expr = ExpressionType(rawValue: cfg.e) {
                     currentExpression = expr
                 }
@@ -681,90 +690,14 @@ class ChatViewModel: ObservableObject {
                         self?.currentExpression = .normal
                     }
                 }
+                break  // 一次只触发一个，避免表达式轮番跳跃
             }
         }
     }
     
     func playSound(_ name: String) {
-        // 优先用系统音效，静音模式下兜底用 AVAudioPlayer
-        if let id = exprConfig.soundID(for: name) {
-            AudioServicesPlaySystemSound(SystemSoundID(id))
-        }
-        DispatchQueue.global().async {
-            Self.playBeep(name: name)
-        }
-    }
-    
-    // 自定义 beep 音，不受静音开关影响
-    nonisolated(unsafe) private static var audioPlayer: AVAudioPlayer?
-    
-    private nonisolated static func playBeep(name: String) {
-        let duration = 0.15
-        let sampleRate = 44100.0
-        let frequency: Double = {
-            switch name {
-            case "camera": return 800
-            case "error", "dizzy": return 400
-            case "happy", "excited", "veryHappy": return 1200
-            case "sad": return 300
-            default: return 800
-            }
-        }()
-        let samples = Int(duration * sampleRate)
-        let bytes = samples * 2
-        
-        // 构建完整 WAV（header + data 一起写入）
-        var data = Data(count: 44 + bytes)
-        data.withUnsafeMutableBytes { p in
-            let b = p.bindMemory(to: UInt8.self)
-            let w32 = { (offset: Int, value: UInt32) in
-                b[offset]   = UInt8(value & 0xff)
-                b[offset+1] = UInt8((value >> 8) & 0xff)
-                b[offset+2] = UInt8((value >> 16) & 0xff)
-                b[offset+3] = UInt8((value >> 24) & 0xff)
-            }
-            let w16 = { (offset: Int, value: UInt16) in
-                b[offset]   = UInt8(value & 0xff)
-                b[offset+1] = UInt8((value >> 8) & 0xff)
-            }
-            // RIFF
-            b[0]=0x52;b[1]=0x49;b[2]=0x46;b[3]=0x46
-            w32(4, UInt32(36 + bytes))
-            b[8]=0x57;b[9]=0x41;b[10]=0x56;b[11]=0x45
-            // fmt
-            b[12]=0x66;b[13]=0x6d;b[14]=0x74;b[15]=0x20
-            w32(16, 16); w16(20, 1); w16(22, 1)
-            w32(24, UInt32(sampleRate))
-            w32(28, UInt32(sampleRate * 2))
-            w16(32, 2); w16(34, 16)
-            // data chunk
-            b[36]=0x64;b[37]=0x61;b[38]=0x74;b[39]=0x61
-            w32(40, UInt32(bytes))
-            // samples (offset 44+)
-            let sb = p.bindMemory(to: Int16.self)
-            for i in 0..<samples {
-                let t = Double(i) / sampleRate
-                let env = 1.0 - t / duration
-                sb[22 + i] = Int16(sin(2 * .pi * frequency * t) * env * 8000)
-            }
-        }
-        
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("beep_\(name).wav")
-        try? data.write(to: tempURL)
-        
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default)
-        try? session.setActive(true)
-        audioPlayer = try? AVAudioPlayer(contentsOf: tempURL)
-        audioPlayer?.volume = 0.6
-        audioPlayer?.play()
-        
-        // 播放完后恢复录音会话
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-            let s = AVAudioSession.sharedInstance()
-            try? s.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
-            try? s.setActive(true, options: .notifyOthersOnDeactivation)
-        }
+        let filename = exprConfig.soundMap[name]
+        SoundService.shared.play(name, filename: filename)
     }
     
     // MARK: - 说话期间表情循环

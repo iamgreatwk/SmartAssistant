@@ -9,7 +9,7 @@ struct ExpressionConfig: Codable {
     let sequences: [String: [SeqConfig]]
     let petEmpathy: [String: String]
     let commands: [String: CommandConfig]
-    let soundMap: [String: Int]
+    let soundMap: [String: String]
     let idleExpressions: [String]
     let listeningExpressions: [String]
     let thinkingExpressions: [String]
@@ -18,6 +18,8 @@ struct ExpressionConfig: Codable {
     let shakeSpikeCount: Int
     let shakeDizzySeconds: Double
     let knockRecoverSeconds: Double
+    let shakeConfig: ShakeConfig
+    let knockConfig: KnockConfig
     var speakingDurationSec: Double = 5.0
     var speakingCycleIntervalSec: Double = 3.0
     var commandDurationSec: Double = 3.0
@@ -85,6 +87,18 @@ struct ExpressionConfig: Codable {
     struct CommandConfig: Codable {
         let e: String   // expression
         let c: String   // command id
+    }
+    
+    struct ShakeConfig: Codable {
+        let e: String
+        let s: String
+    }
+    
+    struct KnockConfig: Codable {
+        let e: String
+        let s: String
+        let lx: CGFloat?
+        let ly: CGFloat?
     }
     
     // MARK: - 加载（Documents 优先，可热更新）
@@ -158,11 +172,6 @@ struct ExpressionConfig: Codable {
                 blink: s.b ?? false
             )
         }
-    }
-    
-    /// 音效 ID
-    func soundID(for name: String) -> Int? {
-        return soundMap[name]
     }
     
     /// 情绪名数组 → ExpressionType 数组
