@@ -143,8 +143,6 @@ class ChatViewModel: ObservableObject {
                 // 更新调试信息 — 所有传感器值始终显示
                 if let d = data {
                     let mag = d.magnitude - 1.0
-                    let gyro = self?.motionService.gyroscopeData
-                    let gyroRate = gyro.map { sqrt($0.x*$0.x + $0.y*$0.y + $0.z*$0.z) } ?? 0
                     let att = self?.motionService.deviceAttitude
                     let rollDeg = att.map { $0.roll * 180 / .pi } ?? 0
                     let pitchDeg = att.map { $0.pitch * 180 / .pi } ?? 0
@@ -539,7 +537,8 @@ class ChatViewModel: ObservableObject {
         if delta > exprConfig.knock.threshold, delta < exprConfig.shake.threshold {
             if now.timeIntervalSince(lastSpikeTime) > exprConfig.knock.recoverSeconds {
                 let kc = exprConfig.knock
-                if let expr = ExpressionType(rawValue: kc.e) {
+                let triggerExpr = ExpressionType(rawValue: kc.e)
+                if let expr = triggerExpr {
                     currentExpression = expr
                     debugInfo.expression = expr.displayName
                     debugInfo.workflow = "敲击"
@@ -548,7 +547,7 @@ class ChatViewModel: ObservableObject {
                 playSound(kc.s)
                 lastSpikeTime = now
                 DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.knock.recoverSeconds) { [weak self] in
-                    if self?.currentExpression == expr { self?.currentExpression = .normal }
+                    if self?.currentExpression == triggerExpr { self?.currentExpression = .normal }
                 }
             }
             return
