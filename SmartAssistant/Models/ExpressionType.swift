@@ -3,7 +3,7 @@ import Foundation
 /// 小智表情类型 — 基于 RoboEyes 算法
 /// 眼睛：填充圆角矩形 + 三角形/矩形眼皮遮盖
 /// 嘴巴：8 种嘴型（保持不变）
-enum ExpressionType: String, CaseIterable, Codable {
+enum ExpressionType: Codable {
     case normal     // 正常
     case happy      // 开心
     case veryHappy  // 非常开心
@@ -25,8 +25,41 @@ enum ExpressionType: String, CaseIterable, Codable {
     case bored      // 无聊
     case focused    // 专注
     case suspicious // 怀疑
+    case custom(String)  // JSON 自定义表情，未枚举的
+
+    var rawValue: String {
+        if case .custom(let name) = self { return name }
+        return String(describing: self)
+    }
+    
+    init?(rawValue: String) {
+        switch rawValue {
+        case "normal": self = .normal
+        case "happy": self = .happy
+        case "veryHappy": self = .veryHappy
+        case "sad": self = .sad
+        case "angry": self = .angry
+        case "surprised": self = .surprised
+        case "thinking": self = .thinking
+        case "listening": self = .listening
+        case "speaking": self = .speaking
+        case "sleepy": self = .sleepy
+        case "wink": self = .wink
+        case "love": self = .love
+        case "confused": self = .confused
+        case "cool": self = .cool
+        case "shy": self = .shy
+        case "excited": self = .excited
+        case "scared": self = .scared
+        case "bored": self = .bored
+        case "focused": self = .focused
+        case "suspicious": self = .suspicious
+        default: self = .custom(rawValue)
+        }
+    }
 
     var displayName: String {
+        if case .custom(let name) = self { return name }
         switch self {
         case .normal: return "正常"
         case .happy: return "开心"
@@ -52,6 +85,7 @@ enum ExpressionType: String, CaseIterable, Codable {
     }
 
     var emoji: String {
+        if case .custom = self { return "❓" }
         switch self {
         case .normal: return "😊"
         case .happy: return "😄"
@@ -74,6 +108,18 @@ enum ExpressionType: String, CaseIterable, Codable {
         case .focused: return "🧐"
         case .suspicious: return "🤨"
         }
+    }
+
+    // MARK: - Codable（通过 rawValue 编解码，支持自定义表情名）
+    
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        self = ExpressionType(rawValue: value)!
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(rawValue)
     }
 
     // MARK: - RoboEyes 参数
@@ -127,9 +173,10 @@ enum ExpressionType: String, CaseIterable, Codable {
         let lx: CGFloat
         let ly: CGFloat
         let isBlink: Bool
+        var delayMs: Double
         
-        init(expr: ExpressionType, lx: CGFloat = 0, ly: CGFloat = 0, blink: Bool = false) {
-            self.expr = expr; self.lx = lx; self.ly = ly; self.isBlink = blink
+        init(expr: ExpressionType, lx: CGFloat = 0, ly: CGFloat = 0, blink: Bool = false, delayMs: Double = 350) {
+            self.expr = expr; self.lx = lx; self.ly = ly; self.isBlink = blink; self.delayMs = delayMs
         }
     }
 

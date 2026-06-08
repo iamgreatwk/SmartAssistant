@@ -75,16 +75,6 @@ class ChatViewModel: ObservableObject {
         case error(String)
     }
     
-    // 情绪→序列映射
-    static let emotionToSequence: [ExpressionType: String] = [
-        .veryHappy: "excited", .excited: "excited",
-        .surprised: "surprise", .scared: "surprise",
-        .angry: "error", .sad: "sadness",
-        .focused: "thinking", .thinking: "thinking",
-        .love: "excited", .sleepy: "sleepySeq",
-        .confused: "curious", .suspicious: "curious",
-    ]
-    
     private var sequenceTimer: AnyCancellable?
     private var sequenceSteps: [ExpressionType.SeqStep] = []
     private var sequenceIndex = 0
@@ -94,29 +84,6 @@ class ChatViewModel: ObservableObject {
     private var speakingCycleTimer: AnyCancellable?
     private var speakingCycle: [ExpressionType] = []
     private var speakingCycleIndex = 0
-    
-    // 情绪→表情循环簇（说话期间 3s 切换）
-    static let emotionClusters: [ExpressionType: [ExpressionType]] = [
-        .happy:     [.happy, .veryHappy, .happy, .love, .wink, .happy],
-        .veryHappy: [.veryHappy, .happy, .love, .excited, .veryHappy],
-        .excited:   [.excited, .surprised, .happy, .excited, .love, .happy],
-        .surprised: [.surprised, .excited, .surprised, .scared, .surprised],
-        .sad:       [.sad, .sleepy, .sad, .confused, .sad, .normal],
-        .angry:     [.angry, .suspicious, .angry, .scared, .angry],
-        .scared:    [.scared, .surprised, .sad, .scared, .normal],
-        .confused:  [.confused, .thinking, .suspicious, .confused, .thinking],
-        .love:      [.love, .shy, .love, .happy, .love, .wink],
-        .sleepy:    [.sleepy, .sad, .normal, .sleepy],
-        .focused:   [.focused, .thinking, .focused, .cool, .focused],
-        .thinking:  [.thinking, .focused, .thinking, .confused, .thinking],
-        .cool:      [.cool, .normal, .cool, .happy, .cool],
-        .shy:       [.shy, .love, .shy, .happy, .shy],
-        .suspicious:[.suspicious, .confused, .thinking, .suspicious],
-        .bored:     [.bored, .sleepy, .normal, .bored],
-        .wink:      [.wink, .happy, .normal, .wink],
-        .speaking:  [.speaking, .normal, .listening, .thinking, .speaking],
-        .normal:    [.normal, .listening, .thinking, .focused, .normal],
-    ]
     
     // MARK: - 服务
     
@@ -229,8 +196,8 @@ class ChatViewModel: ObservableObject {
             lookY = step.ly
         }
         
-        // 每步持续 0.35 秒（与 HTML 的 delay 帧对应）
-        sequenceTimer = Timer.publish(every: 0.35, on: .main, in: .common)
+        let delay: Double = step.delayMs / 1000.0
+        sequenceTimer = Timer.publish(every: delay, on: .main, in: .common)
             .autoconnect()
             .first()
             .sink { [weak self] _ in
@@ -335,7 +302,8 @@ class ChatViewModel: ObservableObject {
             isListening = true
             conversationState = .listening
             currentExpression = .listening
-            lookX = 0; lookY = -0.2
+            let l = exprConfig.look(for: "listening")
+            lookX = l.0; lookY = l.1
             logDebug(\.workflow, "聆听中")
         } catch {}
     }
@@ -367,7 +335,8 @@ class ChatViewModel: ObservableObject {
         messages.append(ChatMessage(role: .user, content: trimmed))
         conversationState = .thinking
         currentExpression = .thinking
-        lookX = 0; lookY = -0.3
+        let tl = exprConfig.look(for: "thinking")
+        lookX = tl.0; lookY = tl.1
         
         // 指令检测
         if let (expr, cmd) = detectCommand(trimmed) {
@@ -404,10 +373,19 @@ class ChatViewModel: ObservableObject {
             conversationState = .error(error.localizedDescription)
             logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
             logDebug(\.workflow, "请求失败")
-            currentExpression = .sad; lookX = 0; lookY = 0.2
-            if !isPlayingSequence { playSequence("error") }
-            playSound("error")
-            messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            let el = exprConfig.look(for: "error")
+            if let errCfg = exprConfig.errorResponse,
+               let errExpr = ExpressionType(rawValue: errCfg.expression) {
+                currentExpression = errExpr
+                if !isPlayingSequence { playSequence(errCfg.sequence) }
+                playSound(errCfg.sound)
+                messages.append(ChatMessage(role: .assistant, content: "error", expression: errExpr))
+            } else {
+                currentExpression = .sad
+                if !isPlayingSequence { playSequence("error") }
+                playSound("error")
+                messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            }
             // 错误后自动恢复
             DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.errorRecoverSec) { [weak self] in
                 self?.conversationState = .idle
@@ -433,15 +411,18 @@ class ChatViewModel: ObservableObject {
         messages.append(ChatMessage(role: .user, content: trimmed))
         isProcessing = true
         conversationState = .thinking
-        currentExpression = .thinking; lookX = 0; lookY = -0.3
+        currentExpression = .thinking
+        do {
+            let tl = exprConfig.look(for: "thinking")
+            lookX = tl.0; lookY = tl.1
         
         if let (expr, cmd) = detectCommand(trimmed) {
             isProcessing = false
             playSound(cmd)
             if cmd == "camera" { cameraActive = true; return }
             currentExpression = expr
-            playSequence("excited")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            playSequence(exprConfig.commandSequence)
+            DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.commandDurationSec) { [weak self] in
                 self?.conversationState = .idle; self?.currentExpression = .normal
             }
             return
@@ -464,10 +445,19 @@ class ChatViewModel: ObservableObject {
             conversationState = .error(error.localizedDescription)
             logDebug(\.aiOutput, "错误: \(error.localizedDescription)")
             logDebug(\.workflow, "请求失败")
-            currentExpression = .sad; lookX = 0; lookY = 0.2
-            if !isPlayingSequence { playSequence("error") }
-            playSound("error")
-            messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            let el = exprConfig.look(for: "error")
+            if let errCfg = exprConfig.errorResponse,
+               let errExpr = ExpressionType(rawValue: errCfg.expression) {
+                currentExpression = errExpr
+                if !isPlayingSequence { playSequence(errCfg.sequence) }
+                playSound(errCfg.sound)
+                messages.append(ChatMessage(role: .assistant, content: "error", expression: errExpr))
+            } else {
+                currentExpression = .sad
+                if !isPlayingSequence { playSequence("error") }
+                playSound("error")
+                messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            }
             // 错误后自动恢复
             DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.errorRecoverSec) { [weak self] in
                 self?.conversationState = .idle
@@ -513,15 +503,16 @@ class ChatViewModel: ObservableObject {
         playSound(finalExpr.rawValue)
         
         // 长时间情绪低落 → 主动安慰
-        if isUserSad() {
-            playSequence("curious")  // 好奇探索 → 试图逗你
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
-                self?.currentExpression = .happy
-                self?.startSpeakingCycle(.happy)
+        if isUserSad(), let comfort = exprConfig.comfort {
+            playSequence(comfort.sequence)
+            let comfortExpr = ExpressionType(rawValue: comfort.expression) ?? .happy
+            DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.responseDelaySec) { [weak self] in
+                self?.currentExpression = comfortExpr
+                self?.startSpeakingCycle(comfortExpr)
             }
         } else if let seqName = exprConfig.sequenceName(for: finalExpr.rawValue) {
             playSequence(seqName)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.responseDelaySec) { [weak self] in
                 guard self?.conversationState == .speaking else { return }
                 self?.currentExpression = finalExpr
                 self?.lookX = 0; self?.lookY = 0

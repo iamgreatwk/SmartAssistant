@@ -9,12 +9,12 @@ class AIChatService: ObservableObject {
     
     private var config: AppConfig
     private var conversationHistory: [ChatRequest.ChatRequestMessage] = []
-    private let maxHistoryCount = 20
+    private var maxHistoryCount: Int { ExpressionConfig.shared.maxHistoryCount }
     
     private let urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        config.timeoutIntervalForRequest = ExpressionConfig.shared.requestTimeoutSec
+        config.timeoutIntervalForResource = ExpressionConfig.shared.resourceTimeoutSec
         return URLSession(configuration: config)
     }()
     

@@ -21,7 +21,46 @@ struct ExpressionConfig: Codable {
     var commandDurationSec: Double = 3.0
     var errorRecoverSec: Double = 4.0
     var expressionEnrichIntervalSec: Double = 1.5
+    var lookShiftRange: LookShiftRange?
+    
+    struct LookShiftRange: Codable {
+        var horizontal: Double = 0.3
+        var vertical: Double = 0.3
+    }
+    var maxHistoryCount: Int = 20
+    var requestTimeoutSec: Double = 30
+    var resourceTimeoutSec: Double = 60
+    let defaultLooks: [String: LookConfig]?
+    let lookRanges: LookRanges?
+    
+    struct LookConfig: Codable {
+        let x: Double
+        let y: Double
+    }
+    
+    struct LookRanges: Codable {
+        let idleX: [Double]
+        let idleY: [Double]
+        let speakingX: [Double]
+        let speakingY: [Double]
+    }
+    
+    struct ComfortConfig: Codable {
+        let sequence: String
+        let expression: String
+    }
+    
+    struct ErrorResponseConfig: Codable {
+        let expression: String
+        let sequence: String
+        let sound: String
+    }
+    
     let sensorTriggers: [String: SensorTriggerConfig]
+    var commandSequence: String = "excited"
+    var responseDelaySec: Double = 3.5
+    let comfort: ComfortConfig?
+    let errorResponse: ErrorResponseConfig?
     let camera: CameraConfig
     
     struct CameraConfig: Codable {
@@ -78,6 +117,7 @@ struct ExpressionConfig: Codable {
         let x: CGFloat?     // lookX
         let y: CGFloat?     // lookY
         let b: Bool?        // isBlink
+        let t: Double?      // frame time in ms (default: 350)
     }
     
     struct CommandConfig: Codable {
@@ -170,7 +210,8 @@ struct ExpressionConfig: Codable {
                 expr: ExpressionType(rawValue: s.e) ?? .normal,
                 lx: s.x ?? 0,
                 ly: s.y ?? 0,
-                blink: s.b ?? false
+                blink: s.b ?? false,
+                delayMs: s.t ?? 350
             )
         }
     }
@@ -178,5 +219,26 @@ struct ExpressionConfig: Codable {
     /// 情绪名数组 → ExpressionType 数组
     func expressionArray(from names: [String]) -> [ExpressionType] {
         return names.compactMap { ExpressionType(rawValue: $0) }
+    }
+    
+    /// 状态 → 默认视线
+    func look(for state: String) -> (CGFloat, CGFloat) {
+        guard let l = defaultLooks?[state] else { return (0, 0) }
+        return (CGFloat(l.x), CGFloat(l.y))
+    }
+    
+    /// 随机视线范围
+    func randomLook(idle: Bool) -> (CGFloat, CGFloat) {
+        guard let ranges = lookRanges else {
+            return idle ? (CGFloat.random(in: -0.4...0.4), CGFloat.random(in: 0.1...0.3))
+                       : (CGFloat.random(in: -0.2...0.2), CGFloat.random(in: -0.25...0.25))
+        }
+        if idle {
+            return (CGFloat.random(in: CGFloat(ranges.idleX[0])...CGFloat(ranges.idleX[1])),
+                    CGFloat.random(in: CGFloat(ranges.idleY[0])...CGFloat(ranges.idleY[1])))
+        } else {
+            return (CGFloat.random(in: CGFloat(ranges.speakingX[0])...CGFloat(ranges.speakingX[1])),
+                    CGFloat.random(in: CGFloat(ranges.speakingY[0])...CGFloat(ranges.speakingY[1])))
+        }
     }
 }

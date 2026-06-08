@@ -142,7 +142,7 @@ function setMood(n){
   S.lxN=CX-S.wN-S.sbN/2;S.lyN=CY-Math.max(S.lhN,S.rhN)/2;
   S.dirty=true;
 }
-function setLook(x,y){S.lxN=CX+x*50-S.wN-S.sbN/2;S.lyN=CY-y*40-Math.max(S.lhN,S.rhN)/2;S.dirty=true;}
+function setLook(x,y){S.lxN=CX+x*S.wN*0.3-S.wN-S.sbN/2;S.lyN=CY-y*S.lhN*0.3-Math.max(S.lhN,S.rhN)/2;S.dirty=true;}
 
 function dE(lx,ly,w,h,br,tired,angry,happy,flat,tag){
   let s='';if(h<=0)return s;
@@ -213,6 +213,11 @@ function loadJSON(input){
       exprCfg.thinkingExpressions=json.thinkingExpressions||[];
       exprCfg.shake=json.shake||{threshold:1.2,spikeCount:2,dizzySeconds:3,e:'confused',s:'dizzy'};
       exprCfg.knock=json.knock||{threshold:0.5,recoverSeconds:0.6,e:'surprised',s:'happy',lx:0,ly:-0.4};
+      exprCfg.aiConfig=json.aiConfig||{maxHistoryCount:20,requestTimeoutSec:30,resourceTimeoutSec:60};
+      exprCfg.defaultLooks=json.defaultLooks||{};
+      exprCfg.lookRanges=json.lookRanges||{};
+      exprCfg.comfort=json.comfort||{sequence:'curious',expression:'happy'};
+      exprCfg.errorResponse=json.errorResponse||{expression:'sad',sequence:'error',sound:'error'};
       exprCfg.speakingDurationSec=json.speakingDurationSec||5.0;
       exprCfg.commandDurationSec=json.commandDurationSec||3.0;
 
@@ -663,6 +668,27 @@ function autoPlaySound(name){
   testAudio.play().catch(()=>{});
 }
 
+// ===== 序列播放 =====
+let seqPlayer={timer:null,index:0,steps:[]};
+function playSequenceFor(name){
+  if(seqPlayer.timer){clearTimeout(seqPlayer.timer);seqPlayer.timer=null;}
+  const seqName=exprCfg.emotionToSequence&&exprCfg.emotionToSequence[name];
+  if(!seqName) return;
+  const steps=exprCfg.sequences&&exprCfg.sequences[seqName];
+  if(!steps||!steps.length) return;
+  seqPlayer.steps=steps;seqPlayer.index=0;
+  playSeqNext();
+}
+function playSeqNext(){
+  if(seqPlayer.index>=seqPlayer.steps.length){seqPlayer.timer=null;return;}
+  const s=seqPlayer.steps[seqPlayer.index++];
+  setMood(s.e||'normal');
+  setLook(s.x||0,s.y||0);
+  if(s.b) setTimeout(()=>setMood(s.e||'normal'),100);
+  const delay=s.t||350;
+  seqPlayer.timer=setTimeout(playSeqNext,Math.max(50,delay));
+}
+
 // ===== 空闲表情循环（模拟 iOS idle 行为）=====
 let idleExpressions=['normal','cool','happy','thinking','wink','focused','normal','shy','listening','normal'];
 let idleIndex=0, idleTimer=null, idleActive=true;
@@ -804,6 +830,8 @@ async function send(){
     last.querySelector('.tag').dataset.emotion='1';
     
     log(`😊 情绪: ${emotion} → ${DISPLAY[emotion]} | 累计${totalTokens}t`);
+    // 自动播放关联序列
+    playSequenceFor(emotion);
     
     history.push({role:'user',content:text},{role:'assistant',content:aiText});
     if(history.length>20) history=history.slice(-20);

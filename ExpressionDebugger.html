@@ -59,6 +59,10 @@ label{font-size:10px;color:#666}
   <!-- === 表情参数 === -->
   <div class="section active" id="sec-face">
     <div class="btns" id="moodBtns"></div>
+    <div class="row" style="margin-bottom:4px">
+      <button onclick="addNewMood()">+ 新建表情</button>
+      <button class="danger" onclick="deleteCurrentMood()">删除当前</button>
+    </div>
     <label>眼宽 <span id="vW">70</span></label><input type="range" min="30" max="100" value="70" class="slider" id="eyeW" oninput="updateParam()">
     <label>眼高 <span id="vH">58</span></label><input type="range" min="20" max="100" value="58" class="slider" id="eyeH" oninput="updateParam()">
     <label>圆角 <span id="vBR">24</span></label><input type="range" min="4" max="40" value="24" class="slider" id="br" oninput="updateParam()">
@@ -84,6 +88,12 @@ label{font-size:10px;color:#666}
       <div><label>右倍率</label><input type="range" min="0" max="2" step="0.01" value="1" class="slider" id="rM" oninput="updateParam()"><span id="vRM">1.00</span></div>
     </div>
     <label>偏移 <span id="vYO">0</span></label><input type="range" min="-15" max="15" step="0.5" value="0" class="slider" id="yo" oninput="updateParam()">
+    <h2>视线方向</h2>
+    <div class="row">
+      <div><label>左右 <span id="vLX">0.0</span></label><input type="range" min="-1" max="1" step="0.05" value="0" class="slider" id="lookX" oninput="let v=parseFloat(this.value);document.getElementById('vLX').textContent=v.toFixed(1);setLook(v,parseFloat(document.getElementById('lookY').value))"></div>
+      <div><label>上下 <span id="vLY">0.0</span></label><input type="range" min="-1" max="1" step="0.05" value="0" class="slider" id="lookY" oninput="let v=parseFloat(this.value);document.getElementById('vLY').textContent=v.toFixed(1);setLook(parseFloat(document.getElementById('lookX').value),v)"></div>
+    </div>
+    <button onclick="document.getElementById('lookX').value=0;document.getElementById('lookY').value=0;setLook(0,0);document.getElementById('vLX').textContent='0.0';document.getElementById('vLY').textContent='0.0'">↺ 重置视线</button>
   </div>
 
   <!-- === 关键词 === -->
@@ -93,12 +103,58 @@ label{font-size:10px;color:#666}
     <textarea id="kwList" rows="3" placeholder="每行一个关键词" onchange="saveKeywords()"></textarea>
   </div>
 
-  <!-- === 序列 === -->
-  <div class="section" id="sec-seq">
-    <h2>动画序列</h2>
-    <select id="seqName" onchange="loadSequence()"><option>greeting</option></select>
-    <div id="seqSteps"></div>
-    <button onclick="addSeqStep()">+ 添加帧</button>
+  <!-- === 序列（关键帧编辑器）=== -->
+  <div class="section" id="sec-seq" style="display:flex;flex-direction:column;height:calc(100vh - 40px)">
+    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+      <select id="seqName" onchange="loadSequence()" style="width:100px"><option>greeting</option></select>
+      <button onclick="renameSequence()">改名</button>
+      <button onclick="addSequence()">+ 新建</button>
+      <button class="danger" onclick="deleteSequence()">删除</button>
+      <span style="flex:1"></span>
+      <input type="number" id="seqBPM" value="171" step="10" min="30" max="600" style="width:60px" title="BPM">
+      <label title="每帧时长=60000/BPM">ms/帧</label>
+      <button onclick="playSequence()" style="background:#1a3a1a;border-color:#3a7a3a;color:#8e8">▶ 播放</button>
+      <button onclick="stopSequence()">⏹ 停止</button>
+    </div>
+    <div style="display:flex;gap:4px;flex:1;min-height:0">
+      <!-- 左侧：RoboEyes 预览 -->
+      <div style="flex:1;background:#000;display:flex;align-items:center;justify-content:center;min-width:200px">
+        <svg id="seqPreview" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet" style="width:100%;max-height:100%"></svg>
+      </div>
+      <!-- 右侧：关键帧参数 -->
+      <div style="width:220px;overflow-y:auto;padding:4px;background:#0f0f18;font-size:10px">
+        <h3>当前帧</h3>
+        <select id="kfExpr" onchange="applyKeyframePreview()" style="width:100%"><option value="">(自定义参数)</option></select>
+        <div class="row"><label>时间ms</label><input type="number" id="kfTime" onchange="syncKeyframeField()" style="width:60px"></div>
+        <label>眼宽<input type="range" min="30" max="100" value="70" id="kfW" oninput="document.getElementById('kvW').textContent=this.value;applyKeyframePreview()"><span id="kvW">70</span></label>
+        <label>眼高<input type="range" min="20" max="100" value="58" id="kfH" oninput="document.getElementById('kvH').textContent=this.value;applyKeyframePreview()"><span id="kvH">58</span></label>
+        <label>圆角<input type="range" min="4" max="40" value="24" id="kfBR" oninput="document.getElementById('kvBR').textContent=this.value;applyKeyframePreview()"><span id="kvBR">24</span></label>
+        <label>间距<input type="range" min="8" max="50" value="20" id="kfSB" oninput="document.getElementById('kvSB').textContent=this.value;applyKeyframePreview()"><span id="kvSB">20</span></label>
+        <label>左疲倦<input type="range" min="0" max="1" step="0.01" value="0" id="kfLT" oninput="document.getElementById('kvLT').textContent=this.value;applyKeyframePreview()"><span id="kvLT">0</span></label>
+        <label>右疲倦<input type="range" min="0" max="1" step="0.01" value="0" id="kfRT" oninput="document.getElementById('kvRT').textContent=this.value;applyKeyframePreview()"><span id="kvRT">0</span></label>
+        <label>左生气<input type="range" min="0" max="1" step="0.01" value="0" id="kfLA" oninput="document.getElementById('kvLA').textContent=this.value;applyKeyframePreview()"><span id="kvLA">0</span></label>
+        <label>右生气<input type="range" min="0" max="1" step="0.01" value="0" id="kfRA" oninput="document.getElementById('kvRA').textContent=this.value;applyKeyframePreview()"><span id="kvRA">0</span></label>
+        <label>左开心<input type="range" min="0" max="1" step="0.01" value="0" id="kfLH" oninput="document.getElementById('kvLH').textContent=this.value;applyKeyframePreview()"><span id="kvLH">0</span></label>
+        <label>右开心<input type="range" min="0" max="1" step="0.01" value="0" id="kfRH" oninput="document.getElementById('kvRH').textContent=this.value;applyKeyframePreview()"><span id="kvRH">0</span></label>
+        <label>左平顶<input type="range" min="0" max="1" step="0.01" value="0" id="kfLF" oninput="document.getElementById('kvLF').textContent=this.value;applyKeyframePreview()"><span id="kvLF">0</span></label>
+        <label>右平顶<input type="range" min="0" max="1" step="0.01" value="0" id="kfRF" oninput="document.getElementById('kvRF').textContent=this.value;applyKeyframePreview()"><span id="kvRF">0</span></label>
+        <label>左倍率<input type="range" min="0" max="2" step="0.01" value="1" id="kfLM" oninput="document.getElementById('kvLM').textContent=this.value;applyKeyframePreview()"><span id="kvLM">1</span></label>
+        <label>右倍率<input type="range" min="0" max="2" step="0.01" value="1" id="kfRM" oninput="document.getElementById('kvRM').textContent=this.value;applyKeyframePreview()"><span id="kvRM">1</span></label>
+        <label>Y偏移<input type="range" min="-15" max="15" value="0" id="kfYO" oninput="document.getElementById('kvYO').textContent=this.value;applyKeyframePreview()"><span id="kvYO">0</span></label>
+        <label>视线X<input type="range" min="-1" max="1" step="0.05" value="0" id="kfLX" oninput="document.getElementById('kvLX').textContent=this.value;applyKeyframePreview()"><span id="kvLX">0</span></label>
+        <label>视线Y<input type="range" min="-1" max="1" step="0.05" value="0" id="kfLY" oninput="document.getElementById('kvLY').textContent=this.value;applyKeyframePreview()"><span id="kvLY">0</span></label>
+        <button onclick="saveCurrentKeyframe()" style="margin:4px 0">💾 保存关键帧</button>
+      </div>
+    </div>
+    <!-- 时间轴 -->
+    <div style="margin-top:4px;background:#0f0f18;padding:6px;border-radius:4px;overflow-x:auto">
+      <div id="timeline" style="display:flex;gap:2px;align-items:flex-end;min-height:50px"></div>
+      <div style="display:flex;gap:4px;margin-top:4px">
+        <button onclick="addKeyframe()">+ 关键帧</button>
+        <button onclick="deleteKeyframe()" class="danger">删除</button>
+        <button onclick="duplicateKeyframe()">复制</button>
+      </div>
+    </div>
   </div>
 
   <!-- === 传感器 === -->
@@ -132,6 +188,31 @@ label{font-size:10px;color:#666}
     <div class="row"><div><label>指令持续(s)</label><input id="sysCmdSec" type="number" step="0.5"></div><div><label>错误恢复(s)</label><input id="sysErrSec" type="number" step="0.5"></div></div>
     <div class="row"><div><label>轮询间隔(s)</label><input id="sysEnrichSec" type="number" step="0.1"></div></div>
     <button onclick="saveSysConfig()" style="margin-top:4px">💾 保存系统配置</button>
+    
+    <h2>AI 配置</h2>
+    <div class="row"><div><label>最大历史</label><input id="sysMaxHist" type="number" step="1"></div><div><label>请求超时(s)</label><input id="sysReqTimeout" type="number" step="5"></div></div>
+    <div class="row"><div><label>资源超时(s)</label><input id="sysResTimeout" type="number" step="5"></div></div>
+    
+    <h2>反应配置</h2>
+    <div class="row"><div><label>指令序列</label><input id="sysCmdSeq"></div><div><label>响应延迟(s)</label><input id="sysRespDelay" type="number" step="0.1"></div></div>
+    <div class="row"><div><label>安慰表情</label><input id="sysComfortE"></div><div><label>安慰序列</label><input id="sysComfortS"></div></div>
+    <div class="row"><div><label>错误表情</label><input id="sysErrE"></div><div><label>错误序列</label><input id="sysErrS"></div><div><label>错误音效</label><input id="sysErrSound"></div></div>
+    <button onclick="saveReactionConfig()" style="margin-top:4px">💾 保存反应配置</button>
+    
+    <h2>默认视线</h2>
+    <div class="row">
+      <div><label>聆听X</label><input id="lookListX" type="number" step="0.1"></div><div><label>聆听Y</label><input id="lookListY" type="number" step="0.1"></div>
+      <div><label>思考X</label><input id="lookThinkX" type="number" step="0.1"></div><div><label>思考Y</label><input id="lookThinkY" type="number" step="0.1"></div>
+    </div>
+    <div class="row"><div><label>错误X</label><input id="lookErrX" type="number" step="0.1"></div><div><label>错误Y</label><input id="lookErrY" type="number" step="0.1"></div></div>
+    <h2>随机视线范围</h2>
+    <div class="row">
+      <div><label>空闲X</label><input id="lrIdleX" placeholder="-0.4,0.4"></div><div><label>空闲Y</label><input id="lrIdleY" placeholder="0.1,0.3"></div>
+    </div>
+    <div class="row">
+      <div><label>说话X</label><input id="lrSpeakX" placeholder="-0.2,0.2"></div><div><label>说话Y</label><input id="lrSpeakY" placeholder="-0.25,0.25"></div>
+    </div>
+    <button onclick="saveLookConfig()" style="margin-top:4px">💾 保存视线配置</button>
   </div>
 
   <!-- === 音效管理 === -->
@@ -202,6 +283,7 @@ function setMood(n){
   const btn=document.getElementById('btn-'+n);if(btn)btn.classList.add('active');
   applyParams();
 }
+function setLook(x,y){S.lxN=CX+x*S.wN*0.3-S.wN-S.sbN/2;S.lyN=CY-y*S.lhN*0.3-Math.max(S.lhN,S.rhN)/2;}
 function updateParam(){
   const m=moodData[currentMood];
   ['eyeW','eyeH','br','sb','lT','rT','lA','rA','lH','rH','lF','rF','lM','rM','yo'].forEach(k=>{m[k]=+document.getElementById(k).value;});
@@ -249,6 +331,8 @@ function saveKeywords(){
 }
 
 // === 序列 ===
+// === 序列编辑器（关键帧）===
+let seqData={frames:[],name:'greeting'}, selectedFrame=-1, seqPlaying=false, seqTimer=null, seqStartTime=0, seqBPM=171;
 function refreshSeqDropdown(){
   if(!fullConfig?.sequences)return;
   const s=document.getElementById('seqName');s.innerHTML='';
@@ -256,33 +340,150 @@ function refreshSeqDropdown(){
   loadSequence();
 }
 function loadSequence(){
-  const n=document.getElementById('seqName').value;
-  const steps=fullConfig.sequences[n]||[];
-  const d=document.getElementById('seqSteps');
-  d.innerHTML=steps.map((s,i)=>`<div class="step-row">
-    帧${i+1} <select onchange="updateSeqStep(${i})" id="seqExpr${i}">
-      ${Object.keys(moodData).map(k=>`<option ${s.e===k?'selected':''}>${k}</option>`).join('')}
-    </select>
-    视线X<input id="seqX${i}" value="${s.x||0}" onchange="updateSeqStep(${i})" type="number" step="0.1">
-    视线Y<input id="seqY${i}" value="${s.y||0}" onchange="updateSeqStep(${i})" type="number" step="0.1">
-    眨眼<input id="seqB${i}" type="checkbox" ${s.b?'checked':''} onchange="updateSeqStep(${i})">
-    <button onclick="delSeqStep(${i})">✕</button>
-  </div>`).join('');
+  const n=document.getElementById('seqName').value;seqData.name=n;selectedFrame=-1;
+  seqData.frames=[];const old=fullConfig.sequences[n]||[];
+  let t=0;const bpm=parseInt(document.getElementById('seqBPM').value)||171;
+  const step=Math.round(60000/bpm);
+  old.forEach(s=>{seqData.frames.push({t:t,e:s.e,x:s.x||0,y:s.y||0,b:s.b||false});t+=step;});
+  if(seqData.frames.length===0) seqData.frames=[{t:0,e:'normal',x:0,y:0,b:false}];
+  // 填充表情下拉
+  const sel=document.getElementById('kfExpr');sel.innerHTML='<option value="">(自定义参数)</option>';
+  if(moodData) Object.keys(moodData).forEach(k=>{sel.innerHTML+=`<option>${k}</option>`;});
+  renderTimeline();
 }
-function updateSeqStep(i){
-  const n=document.getElementById('seqName').value;
-  const s=fullConfig.sequences[n];
-  s[i].e=document.getElementById('seqExpr'+i).value;
-  s[i].x=+document.getElementById('seqX'+i).value;
-  s[i].y=+document.getElementById('seqY'+i).value;
-  s[i].b=document.getElementById('seqB'+i).checked;
+function renameSequence(){
+  const old=document.getElementById('seqName').value;
+  const n=prompt('新名称:',old);if(!n||n===old)return;
+  fullConfig.sequences[n]=fullConfig.sequences[old];delete fullConfig.sequences[old];
+  refreshSeqDropdown();document.getElementById('seqName').value=n;loadSequence();
 }
-function addSeqStep(){
-  const n=document.getElementById('seqName').value;
-  fullConfig.sequences[n].push({e:'normal',x:0,y:0,b:false});
-  loadSequence();
+function addSequence(){
+  const n=prompt('序列名称:');if(!n||fullConfig.sequences[n])return;
+  fullConfig.sequences[n]=[{e:'normal',x:0,y:0,b:false}];
+  refreshSeqDropdown();document.getElementById('seqName').value=n;loadSequence();
 }
-function delSeqStep(i){const n=document.getElementById('seqName').value;fullConfig.sequences[n].splice(i,1);loadSequence();}
+function deleteSequence(){
+  const n=document.getElementById('seqName').value;
+  if(!confirm('删除序列 "'+n+'"?'))return;
+  delete fullConfig.sequences[n];refreshSeqDropdown();loadSequence();
+}
+
+function syncToFullConfig(){
+  const frames=seqData.frames.map(f=>{
+    const obj={e:f.e,x:f.x||0,y:f.y||0,b:f.b||false};
+    const nextIdx=seqData.frames.indexOf(f)+1;
+    if(nextIdx<seqData.frames.length) obj.t=seqData.frames[nextIdx].t-f.t;
+    return obj;
+  });
+  fullConfig.sequences[seqData.name]=frames;
+}
+
+function renderTimeline(){
+  const el=document.getElementById('timeline');el.innerHTML='';
+  if(seqData.frames.length===0) return;
+  const maxT=Math.max(seqData.frames[seqData.frames.length-1].t,1);
+  seqData.frames.forEach((f,i)=>{
+    const left=(f.t/maxT*100).toFixed(1);
+    const emoji=EMOJI[f.e]||'';const disp=DISPLAY[f.e]||f.e;
+    const active=i===selectedFrame?' style="border-color:#7cfc00;background:#1a3018"':'';
+    el.innerHTML+=`<div${active} class="step-row" onclick="selectKeyframe(${i})" style="position:relative;left:${left}%;cursor:pointer;transform:translateX(-50%)">
+      <div style="font-size:8px;color:#666">${f.t}ms</div>
+      <div>${emoji}${disp}</div>
+      <input type="range" style="width:30px" min="${i>0?seqData.frames[i-1].t+50:f.t}" max="${i<seqData.frames.length-1?seqData.frames[i+1].t-50:f.t+1000}" value="${f.t}" onchange="moveKeyframe(${i},this.value);event.stopPropagation()">
+    </div>`;
+  });
+}
+function selectKeyframe(i){selectedFrame=i;renderTimeline();loadKeyframeToPanel();}
+function moveKeyframe(i,newT){seqData.frames[i].t=parseInt(newT);seqData.frames.sort((a,b)=>a.t-b.t);selectedFrame=seqData.frames.findIndex(f=>f===seqData.frames[i]||f.t===parseInt(newT));renderTimeline();syncToFullConfig();}
+
+const kfKeys=['e','W','H','BR','SB','LT','RT','LA','RA','LH','RH','LF','RF','LM','RM','YO','LX','LY'];
+function loadKeyframeToPanel(){
+  if(selectedFrame<0||selectedFrame>=seqData.frames.length)return;
+  const f=seqData.frames[selectedFrame];
+  document.getElementById('kfExpr').value=f.e||'';
+  if(f.e&&moodData[f.e]){
+    const m=moodData[f.e];
+    document.getElementById('kfW').value=m.eyeW;document.getElementById('kvW').textContent=m.eyeW;
+    document.getElementById('kfH').value=m.eyeH;document.getElementById('kvH').textContent=m.eyeH;
+    document.getElementById('kfBR').value=m.br;document.getElementById('kvBR').textContent=m.br;
+    document.getElementById('kfSB').value=m.sb;document.getElementById('kvSB').textContent=m.sb;
+    document.getElementById('kfLT').value=m.lT;document.getElementById('kvLT').textContent=m.lT;
+    document.getElementById('kfRT').value=m.rT;document.getElementById('kvRT').textContent=m.rT;
+    document.getElementById('kfLA').value=m.lA;document.getElementById('kvLA').textContent=m.lA;
+    document.getElementById('kfRA').value=m.rA;document.getElementById('kvRA').textContent=m.rA;
+    document.getElementById('kfLH').value=m.lH;document.getElementById('kvLH').textContent=m.lH;
+    document.getElementById('kfRH').value=m.rH;document.getElementById('kvRH').textContent=m.rH;
+    document.getElementById('kfLF').value=m.lF;document.getElementById('kvLF').textContent=m.lF;
+    document.getElementById('kfRF').value=m.rF;document.getElementById('kvRF').textContent=m.rF;
+    document.getElementById('kfLM').value=m.lM;document.getElementById('kvLM').textContent=m.lM;
+    document.getElementById('kfRM').value=m.rM;document.getElementById('kvRM').textContent=m.rM;
+    document.getElementById('kfYO').value=m.yo;document.getElementById('kvYO').textContent=m.yo;
+  }
+  document.getElementById('kfTime').value=f.t;
+  document.getElementById('kfLX').value=f.x||0;document.getElementById('kvLX').textContent=f.x||0;
+  document.getElementById('kfLY').value=f.y||0;document.getElementById('kvLY').textContent=f.y||0;
+  applyKeyframePreview();
+}
+function applyKeyframePreview(){
+  if(selectedFrame<0)return;
+  const e=document.getElementById('kfExpr').value;
+  const params={
+    w:parseInt(document.getElementById('kfW').value),h:parseInt(document.getElementById('kfH').value),
+    br:parseInt(document.getElementById('kfBR').value),sb:parseInt(document.getElementById('kfSB').value),
+    lT:parseFloat(document.getElementById('kfLT').value),rT:parseFloat(document.getElementById('kfRT').value),
+    lA:parseFloat(document.getElementById('kfLA').value),rA:parseFloat(document.getElementById('kfRA').value),
+    lH:parseFloat(document.getElementById('kfLH').value),rH:parseFloat(document.getElementById('kfRH').value),
+    lF:parseFloat(document.getElementById('kfLF').value),rF:parseFloat(document.getElementById('kfRF').value),
+    lM:parseFloat(document.getElementById('kfLM').value),rM:parseFloat(document.getElementById('kfRM').value),
+    yo:parseFloat(document.getElementById('kfYO').value),
+    x:parseFloat(document.getElementById('kfLX').value),y:parseFloat(document.getElementById('kfLY').value)
+  };
+  const w=params.w,h=params.h,br=params.br,sb=params.sb;
+  const lh=h*params.lM,rh=h*params.rM;
+  const lx=CX-w-sb/2+params.x*w*0.3,ly=CY-params.y*lh*0.3-Math.max(lh,rh)/2+params.yo;
+  const rx=lx+w+sb;
+  let html=`<rect width="400" height="200" fill="#000"/>`;
+  html+=drawE(lx,ly,w,lh,br,params.lT,params.lA,params.lH,params.lF,'L');
+  html+=drawE(rx,ly,w,rh,br,params.rT,params.rA,params.rH,params.rF,'R');
+  document.getElementById('seqPreview').innerHTML=html;
+}
+function syncKeyframeField(){if(selectedFrame>=0)seqData.frames[selectedFrame].t=parseInt(document.getElementById('kfTime').value)||0;renderTimeline();}
+function saveCurrentKeyframe(){
+  if(selectedFrame<0)return;
+  const f=seqData.frames[selectedFrame];
+  const e=document.getElementById('kfExpr').value;
+  if(e){f.e=e;document.getElementById('kf'+kfKeys[1]).value=Math.round(parseInt(document.getElementById('kfW').value));}
+  f.x=parseFloat(document.getElementById('kfLX').value)||0;f.y=parseFloat(document.getElementById('kfLY').value)||0;
+  f.t=parseInt(document.getElementById('kfTime').value)||0;
+  syncToFullConfig();renderTimeline();loadKeyframeToPanel();
+}
+function addKeyframe(){
+  const last=seqData.frames.length?seqData.frames[seqData.frames.length-1]:{t:0};
+  seqData.frames.push({t:last.t+350,e:'normal',x:0,y:0,b:false});
+  selectedFrame=seqData.frames.length-1;
+  syncToFullConfig();renderTimeline();loadKeyframeToPanel();
+}
+function deleteKeyframe(){if(selectedFrame<0||seqData.frames.length<=1)return;seqData.frames.splice(selectedFrame,1);selectedFrame=Math.min(selectedFrame,seqData.frames.length-1);syncToFullConfig();renderTimeline();loadKeyframeToPanel();}
+function duplicateKeyframe(){if(selectedFrame<0)return;seqData.frames.splice(selectedFrame+1,0,{...seqData.frames[selectedFrame]});selectedFrame++;syncToFullConfig();renderTimeline();}
+
+let seqPlayTimer=null,seqPlayIndex=0;
+function playSequence(){
+  if(seqPlaying){stopSequence();return;}
+  seqPlaying=true;seqPlayIndex=0;
+  playNextFrame();
+}
+function stopSequence(){seqPlaying=false;if(seqPlayTimer)clearTimeout(seqPlayTimer);setMood('normal');}
+function playNextFrame(){
+  if(!seqPlaying||seqPlayIndex>=seqData.frames.length){stopSequence();return;}
+  const f=seqData.frames[seqPlayIndex];
+  const e=document.getElementById('kfExpr');e.value=f.e||'normal';
+  const m=f.e&&moodData[f.e]?moodData[f.e]:null;
+  if(m){S.wN=m.eyeW;S.hN=m.eyeH;S.brN=m.br;S.sbN=m.sb;S.lhN=m.h*m.lM;S.rhN=m.h*m.rM;S.lTN=m.lT;S.rTN=m.rT;S.lAN=m.lA;S.rAN=m.rA;S.lHN=m.lH;S.rHN=m.rH;S.lFN=m.lF;S.rFN=m.rF;S.yoN=m.yo;}
+  S.lxN=CX-S.wN-S.sbN/2+f.x*S.wN*0.3;S.lyN=CY-f.y*S.lhN*0.3-Math.max(S.lhN,S.rhN)/2;
+  const next=seqPlayIndex+1;const delay=next<seqData.frames.length?seqData.frames[next].t-f.t:350;
+  seqPlayIndex++;seqPlayTimer=setTimeout(playNextFrame,Math.max(50,delay));
+  document.getElementById('kfTime').value=f.t;document.getElementById('kvLX').textContent=f.x||0;document.getElementById('kvLY').textContent=f.y||0;
+}
 
 // === 传感器 ===
 function refreshTriggerDropdown(){
@@ -358,6 +559,9 @@ function loadSysConfig(){
   if(!fullConfig) return;
   const s=(fullConfig.shake||{});
   const k=(fullConfig.knock||{});
+  const a=(fullConfig.aiConfig||{});
+  const c=(fullConfig.comfort||{});
+  const e=(fullConfig.errorResponse||{});
   document.getElementById('sysShakeE').value=s.e||'confused';
   document.getElementById('sysShakeS').value=s.s||'dizzy';
   document.getElementById('sysKnockE').value=k.e||'surprised';
@@ -374,19 +578,39 @@ function loadSysConfig(){
   document.getElementById('sysCmdSec').value=fullConfig.commandDurationSec||3;
   document.getElementById('sysErrSec').value=fullConfig.errorRecoverSec||4;
   document.getElementById('sysEnrichSec').value=fullConfig.expressionEnrichIntervalSec||1.5;
+  document.getElementById('sysMaxHist').value=a.maxHistoryCount||20;
+  document.getElementById('sysReqTimeout').value=a.requestTimeoutSec||30;
+  document.getElementById('sysResTimeout').value=a.resourceTimeoutSec||60;
+  document.getElementById('sysCmdSeq').value=fullConfig.commandSequence||'excited';
+  document.getElementById('sysRespDelay').value=fullConfig.responseDelaySec||3.5;
+  document.getElementById('sysComfortE').value=c.expression||'happy';
+  document.getElementById('sysComfortS').value=c.sequence||'curious';
+  document.getElementById('sysErrE').value=e.expression||'sad';
+  document.getElementById('sysErrS').value=e.sequence||'error';
+  document.getElementById('sysErrSound').value=e.sound||'error';
+  const dl=(fullConfig.defaultLooks||{});
+  document.getElementById('lookListX').value=(dl.listening||{}).x||0;
+  document.getElementById('lookListY').value=(dl.listening||{}).y||-0.2;
+  document.getElementById('lookThinkX').value=(dl.thinking||{}).x||0;
+  document.getElementById('lookThinkY').value=(dl.thinking||{}).y||-0.3;
+  document.getElementById('lookErrX').value=(dl.error||{}).x||0;
+  document.getElementById('lookErrY').value=(dl.error||{}).y||0.2;
+  const lr=(fullConfig.lookRanges||{});
+  document.getElementById('lrIdleX').value=(lr.idleX||[-0.4,0.4]).join(',');
+  document.getElementById('lrIdleY').value=(lr.idleY||[0.1,0.3]).join(',');
+  document.getElementById('lrSpeakX').value=(lr.speakingX||[-0.2,0.2]).join(',');
+  document.getElementById('lrSpeakY').value=(lr.speakingY||[-0.25,0.25]).join(',');
 }
 function saveSysConfig(){
   if(!fullConfig) return;
   fullConfig.shake={
-    e:document.getElementById('sysShakeE').value,
-    s:document.getElementById('sysShakeS').value,
+    e:document.getElementById('sysShakeE').value,s:document.getElementById('sysShakeS').value,
     threshold:parseFloat(document.getElementById('sysShakeThr').value)||1.2,
     spikeCount:parseInt(document.getElementById('sysSpikeCnt').value)||2,
     dizzySeconds:parseFloat(document.getElementById('sysDizzySec').value)||3
   };
   fullConfig.knock={
-    e:document.getElementById('sysKnockE').value,
-    s:document.getElementById('sysKnockS').value,
+    e:document.getElementById('sysKnockE').value,s:document.getElementById('sysKnockS').value,
     lx:parseFloat(document.getElementById('sysKnockLX').value)||0,
     ly:parseFloat(document.getElementById('sysKnockLY').value)||-0.4,
     threshold:parseFloat(document.getElementById('sysKnockThr').value)||0.5,
@@ -398,6 +622,40 @@ function saveSysConfig(){
   fullConfig.errorRecoverSec=parseFloat(document.getElementById('sysErrSec').value)||4;
   fullConfig.expressionEnrichIntervalSec=parseFloat(document.getElementById('sysEnrichSec').value)||1.5;
   document.getElementById('status').textContent='✅ 系统配置已保存';
+}
+function saveReactionConfig(){
+  if(!fullConfig) return;
+  fullConfig.aiConfig={
+    maxHistoryCount:parseInt(document.getElementById('sysMaxHist').value)||20,
+    requestTimeoutSec:parseFloat(document.getElementById('sysReqTimeout').value)||30,
+    resourceTimeoutSec:parseFloat(document.getElementById('sysResTimeout').value)||60
+  };
+  fullConfig.commandSequence=document.getElementById('sysCmdSeq').value||'excited';
+  fullConfig.responseDelaySec=parseFloat(document.getElementById('sysRespDelay').value)||3.5;
+  fullConfig.comfort={
+    expression:document.getElementById('sysComfortE').value||'happy',
+    sequence:document.getElementById('sysComfortS').value||'curious'
+  };
+  fullConfig.errorResponse={
+    expression:document.getElementById('sysErrE').value||'sad',
+    sequence:document.getElementById('sysErrS').value||'error',
+    sound:document.getElementById('sysErrSound').value||'error'
+  };
+  document.getElementById('status').textContent='✅ 反应配置已保存';
+}
+function saveLookConfig(){
+  if(!fullConfig) return;
+  fullConfig.defaultLooks={
+    listening:{x:parseFloat(document.getElementById('lookListX').value)||0,y:parseFloat(document.getElementById('lookListY').value)||-0.2},
+    thinking:{x:parseFloat(document.getElementById('lookThinkX').value)||0,y:parseFloat(document.getElementById('lookThinkY').value)||-0.3},
+    error:{x:parseFloat(document.getElementById('lookErrX').value)||0,y:parseFloat(document.getElementById('lookErrY').value)||0.2}
+  };
+  const p=v=>{const a=v.split(',');return[parseFloat(a[0])||0,parseFloat(a[1])||0];};
+  fullConfig.lookRanges={
+    idleX:p(document.getElementById('lrIdleX').value),idleY:p(document.getElementById('lrIdleY').value),
+    speakingX:p(document.getElementById('lrSpeakX').value),speakingY:p(document.getElementById('lrSpeakY').value)
+  };
+  document.getElementById('status').textContent='✅ 视线配置已保存';
 }
 
 // === 音效管理 ===
@@ -476,6 +734,21 @@ function render(){
 function initMoodBtns(){
   const b=document.getElementById('moodBtns');b.innerHTML='';
   Object.keys(moodData).forEach(k=>{const btn=document.createElement('button');btn.textContent=k;btn.className='mood-btn';btn.id='btn-'+k;btn.onclick=()=>setMood(k);b.appendChild(btn);});
+}
+function addNewMood(){
+  const name=prompt('新表情名称 (英文, 如 custom1):'); if(!name||moodData[name]) return;
+  moodData[name]={eyeW:70,eyeH:58,br:24,sb:20,lT:0,rT:0,lA:0,rA:0,lH:0,rH:0,lF:0,rF:0,lM:1,rM:1,yo:0};
+  if(fullConfig) fullConfig.moods=moodData;
+  initMoodBtns();setMood(name);
+  document.getElementById('status').textContent='✅ 已添加: '+name;
+}
+function deleteCurrentMood(){
+  if(!confirm('删除表情 "'+currentMood+'"?')) return;
+  delete moodData[currentMood];
+  if(fullConfig) fullConfig.moods=moodData;
+  const names=Object.keys(moodData);
+  if(names.length){ initMoodBtns();setMood(names[0]); }
+  document.getElementById('status').textContent='✅ 已删除';
 }
 initMoodBtns();setMood('normal');requestAnimationFrame(render);
 </script>

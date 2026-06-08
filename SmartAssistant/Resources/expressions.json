@@ -207,6 +207,37 @@
   "commandDurationSec": 3.0,
   "errorRecoverSec": 4.0,
   "expressionEnrichIntervalSec": 1.5,
+  "lookShiftRange": {
+    "horizontal": 0.3,
+    "vertical": 0.3
+  },
+  "aiConfig": {
+    "maxHistoryCount": 20,
+    "requestTimeoutSec": 30,
+    "resourceTimeoutSec": 60
+  },
+  "defaultLooks": {
+    "listening": { "x": 0, "y": -0.2 },
+    "thinking":  { "x": 0, "y": -0.3 },
+    "error":     { "x": 0, "y": 0.2 }
+  },
+  "lookRanges": {
+    "idleX":     [-0.4, 0.4],
+    "idleY":     [0.1, 0.3],
+    "speakingX": [-0.2, 0.2],
+    "speakingY": [-0.25, 0.25]
+  },
+  "commandSequence": "excited",
+  "responseDelaySec": 3.5,
+  "comfort": {
+    "sequence": "curious",
+    "expression": "happy"
+  },
+  "errorResponse": {
+    "expression": "sad",
+    "sequence": "error",
+    "sound": "error"
+  },
   "sensorTriggers": {
     "upsideDown":    { "e": "surprised", "s": "surprised", "t": 2.5, "pitch": -35 },
     "tilted":        { "e": "confused",  "s": null,        "t": 2.0, "roll": 35 },

@@ -41,7 +41,7 @@ function setMood(n){
   S.lxN=CX-S.wN-S.sbN/2;S.lyN=CY-Math.max(S.lhN,S.rhN)/2;
   S.dirty=true;
 }
-function setLook(x,y){S.lxN=CX+x*50-S.wN-S.sbN/2;S.lyN=CY-y*40-Math.max(S.lhN,S.rhN)/2;S.dirty=true;}
+function setLook(x,y){S.lxN=CX+x*S.wN*0.3-S.wN-S.sbN/2;S.lyN=CY-y*S.lhN*0.3-Math.max(S.lhN,S.rhN)/2;S.dirty=true;}
 
 function dE(lx,ly,w,h,br,tired,angry,happy,flat,tag){
   let s='';if(h<=0)return s;
@@ -57,7 +57,6 @@ function dE(lx,ly,w,h,br,tired,angry,happy,flat,tag){
   return s;
 }
 
-// 缓存上一帧字符串，避免无意义重写
 let lastSVG='';
 function render(){
   S.lx=L(S.lx,S.lxN);S.ly=L(S.ly,S.lyN);S.w=L(S.w,S.wN);S.h=L(S.h,S.hN);
@@ -69,11 +68,9 @@ function render(){
   S.nextBlink--;let blink=S.nextBlink<6;
   let lh=blink?1:S.lh,rh=blink?1:S.rh;
   if(blink&&S.nextBlink===0){S.nextBlink=150+Math.floor(Math.random()*360);}
-
   let h=`<rect width="${W}" height="${H}" fill="${BG}"/>`;
   h+=dE(S.lx,S.ly+yo,lw,lh,S.br,S.lT,S.lA,S.lH,S.lF,'L');
   h+=dE(S.rx,S.ly+yo,rw,rh,S.br,S.rT,S.rA,S.rH,S.rF,'R');
-
   if(h!==lastSVG){lastSVG=h;document.getElementById('s').innerHTML=h;}
   requestAnimationFrame(render);
 }
