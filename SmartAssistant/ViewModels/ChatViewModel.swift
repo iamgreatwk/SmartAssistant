@@ -573,6 +573,8 @@ class ChatViewModel: ObservableObject {
                     isDizzy = true
                     if let expr = ExpressionType(rawValue: exprConfig.shakeConfig.e) {
                         currentExpression = expr
+                        debugInfo.expression = expr.displayName
+                        debugInfo.workflow = "摇晃"
                     }
                     playSound(exprConfig.shakeConfig.s)
                     spikeCount = 0
@@ -587,6 +589,8 @@ class ChatViewModel: ObservableObject {
                 let kc = exprConfig.knockConfig
                 if let expr = ExpressionType(rawValue: kc.e) {
                     currentExpression = expr
+                    debugInfo.expression = expr.displayName
+                    debugInfo.workflow = "敲击"
                 }
                 lookX = kc.lx ?? 0; lookY = kc.ly ?? -0.4
                 playSound(kc.s)
@@ -681,6 +685,8 @@ class ChatViewModel: ObservableObject {
                 lastTriggerDuration = cfg.t
                 if let expr = ExpressionType(rawValue: cfg.e) {
                     currentExpression = expr
+                    debugInfo.expression = expr.displayName
+                    debugInfo.workflow = "传感器: \(triggerName)"
                 }
                 if let sound = cfg.s {
                     playSound(sound)
