@@ -169,13 +169,13 @@ struct ContentView: View {
             }
             .font(.system(size: 9, design: .monospaced))
             .foregroundColor(.green.opacity(0.7))
-            .padding(8)
-            .frame(maxWidth: width * 0.42, alignment: .leading)
+            .padding(6)
+            .frame(maxWidth: min(width * 0.32, 260), alignment: .leading)
             .background(.black.opacity(0.85))
             .cornerRadius(8)
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.trailing, 8)
+        .padding(.trailing, 4)
     }
     
     private func handleTap() {}
