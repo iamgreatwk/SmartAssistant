@@ -211,10 +211,8 @@ function loadJSON(input){
       exprCfg.idleExpressions=json.idleExpressions||[];
       exprCfg.listeningExpressions=json.listeningExpressions||[];
       exprCfg.thinkingExpressions=json.thinkingExpressions||[];
-      exprCfg.shakeConfig=json.shakeConfig||{e:'confused',s:'dizzy'};
-      exprCfg.knockConfig=json.knockConfig||{e:'surprised',s:'happy',lx:0,ly:-0.4};
-      exprCfg.shakeThreshold=json.shakeThreshold||1.2;
-      exprCfg.shakeSpikeCount=json.shakeSpikeCount||2;
+      exprCfg.shake=json.shake||{threshold:1.2,spikeCount:2,dizzySeconds:3,e:'confused',s:'dizzy'};
+      exprCfg.knock=json.knock||{threshold:0.5,recoverSeconds:0.6,e:'surprised',s:'happy',lx:0,ly:-0.4};
       exprCfg.speakingDurationSec=json.speakingDurationSec||5.0;
       exprCfg.commandDurationSec=json.commandDurationSec||3.0;
 
@@ -264,12 +262,8 @@ const SENSOR_DEFAULTS=[
     params:[{key:'altChange',label:'高度变化(m)',min:0.5,max:10,step:0.5,val:3}]},
   {id:'altitudeDown',label:'下降',emoji:'🪂',expr:'scared',seq:'surprise',sec:3,
     params:[{key:'altChange',label:'高度变化(m)',min:-10,max:-0.5,step:0.5,val:-3}]},
-  {id:'walking',label:'走路',emoji:'🚶',expr:'happy',sec:3,
-    params:[{key:'stepsPerMin',label:'步频(步/分)',min:30,max:150,step:10,val:60}]},
   {id:'faceClose',label:'靠近',emoji:'🫣',expr:'shy',sec:2,
     params:[{key:'proximityDist',label:'距离(cm)',min:1,max:30,step:1,val:10}]},
-  {id:'hotTemp',label:'高温',emoji:'🥵',expr:'angry',sec:4,
-    params:[{key:'tempAbove',label:'温度高于(°C)',min:25,max:50,step:1,val:35}]},
   {id:'pickedUp',label:'拿起',emoji:'✋',expr:'surprised',seq:'surprise',sec:3,
     params:[{key:'accelBelow',label:'加速度低于(g)',min:0.1,max:1,step:0.1,val:0.6},{key:'rollMin',label:'横滚> (°)',min:0,max:30,step:1,val:10}]},
 ];
@@ -279,8 +273,8 @@ let sensorTimer=null, activeSensor=null, selectedSensor=null;
 function rebuildSensors(){
   currentSensors=[];
   if(jsonLoaded && Object.keys(exprCfg.sensorTriggers).length>0){
-    const labels={upsideDown:'倒置',tilted:'倾斜',fastSpin:'旋转',fastMoving:'快移',freeFall:'掉落',stillLong:'静止',lightDark:'黑暗',altitudeUp:'上升',altitudeDown:'下降',walking:'走路',faceClose:'靠近',hotTemp:'高温',pickedUp:'拿起'};
-    const emojis={upsideDown:'🙃',tilted:'🫨',fastSpin:'😵',fastMoving:'🏃',freeFall:'🫣',stillLong:'😴',lightDark:'🌑',altitudeUp:'🛗',altitudeDown:'🪂',walking:'🚶',faceClose:'🫣',hotTemp:'🥵',pickedUp:'✋'};
+    const labels={upsideDown:'倒置',tilted:'倾斜',fastSpin:'旋转',fastMoving:'快移',freeFall:'掉落',stillLong:'静止',lightDark:'黑暗',altitudeUp:'上升',altitudeDown:'下降',faceClose:'靠近',pickedUp:'拿起'};
+    const emojis={upsideDown:'🙃',tilted:'🫨',fastSpin:'😵',fastMoving:'🏃',freeFall:'🫣',stillLong:'😴',lightDark:'🌑',altitudeUp:'🛗',altitudeDown:'🪂',faceClose:'🫣',pickedUp:'✋'};
     for(const[k,v] of Object.entries(exprCfg.sensorTriggers)){
       const params=[];
       for(const[pk,pv] of Object.entries(v)){
@@ -546,9 +540,7 @@ function checkSensorTriggers(){
     if(rawSensor.light<8) fired.push({id:'lightDark',expr:'sleepy',sec:4});
     if(rawSensor.altitude>2.5) fired.push({id:'altitudeUp',expr:'surprised',sec:3});
     if(rawSensor.altitude<-2.5) fired.push({id:'altitudeDown',expr:'scared',sec:3});
-    if(rawSensor.steps>50) fired.push({id:'walking',expr:'happy',sec:3});
     if(rawSensor.proximity) fired.push({id:'faceClose',expr:'shy',sec:2});
-    if(rawSensor.temp>33) fired.push({id:'hotTemp',expr:'angry',sec:4});
     if(accelMag<0.5&&Math.abs(roll)>8) fired.push({id:'pickedUp',expr:'surprised',sec:3});
   }
   

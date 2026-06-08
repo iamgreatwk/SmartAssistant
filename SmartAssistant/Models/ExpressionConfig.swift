@@ -14,12 +14,8 @@ struct ExpressionConfig: Codable {
     let listeningExpressions: [String]
     let thinkingExpressions: [String]
     let negativeEmotions: [String]
-    let shakeThreshold: Double
-    let shakeSpikeCount: Int
-    let shakeDizzySeconds: Double
-    let knockRecoverSeconds: Double
-    let shakeConfig: ShakeConfig
-    let knockConfig: KnockConfig
+    let shake: ShakeConfig
+    let knock: KnockConfig
     var speakingDurationSec: Double = 5.0
     var speakingCycleIntervalSec: Double = 3.0
     var commandDurationSec: Double = 3.0
@@ -92,6 +88,9 @@ struct ExpressionConfig: Codable {
     struct ShakeConfig: Codable {
         let e: String
         let s: String
+        var threshold: Double = 1.2
+        var spikeCount: Int = 2
+        var dizzySeconds: Double = 3.0
     }
     
     struct KnockConfig: Codable {
@@ -99,6 +98,8 @@ struct ExpressionConfig: Codable {
         let s: String
         let lx: CGFloat?
         let ly: CGFloat?
+        var threshold: Double = 0.5
+        var recoverSeconds: Double = 0.6
     }
     
     // MARK: - 加载（Documents 优先，可热更新）

@@ -561,32 +561,10 @@ class ChatViewModel: ObservableObject {
         let now = Date()
         lastAccel = mag
         
-        // 尖峰检测（敲击/短冲击）
-        if delta > exprConfig.shakeThreshold {
-            // 距上次尖峰超过 knockRecoverSeconds 则重置计数
-            if now.timeIntervalSince(lastSpikeTime) > exprConfig.knockRecoverSeconds { spikeCount = 0 }
-            spikeCount += 1
-            lastSpikeTime = now
-            
-            if spikeCount >= exprConfig.shakeSpikeCount {
-                if !isDizzy {
-                    isDizzy = true
-                    if let expr = ExpressionType(rawValue: exprConfig.shakeConfig.e) {
-                        currentExpression = expr
-                        debugInfo.expression = expr.displayName
-                        debugInfo.workflow = "摇晃"
-                    }
-                    playSound(exprConfig.shakeConfig.s)
-                    spikeCount = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.shakeDizzySeconds) { [weak self] in
-                        self?.isDizzy = false
-                        self?.currentExpression = .normal
-                    }
-                }
-            } else if spikeCount == 1 {
-                let saved = currentExpression
-                let savedX = lookX, savedY = lookY
-                let kc = exprConfig.knockConfig
+        // 敲击检测（单次脉冲，阈值较低）
+        if delta > exprConfig.knock.threshold, delta < exprConfig.shake.threshold {
+            if now.timeIntervalSince(lastSpikeTime) > exprConfig.knock.recoverSeconds {
+                let kc = exprConfig.knock
                 if let expr = ExpressionType(rawValue: kc.e) {
                     currentExpression = expr
                     debugInfo.expression = expr.displayName
@@ -594,10 +572,33 @@ class ChatViewModel: ObservableObject {
                 }
                 lookX = kc.lx ?? 0; lookY = kc.ly ?? -0.4
                 playSound(kc.s)
-                DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.knockRecoverSeconds) { [weak self] in
-                    if self?.currentExpression == .surprised {
-                        self?.currentExpression = saved
-                        self?.lookX = savedX; self?.lookY = savedY
+                lastSpikeTime = now
+                DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.knock.recoverSeconds) { [weak self] in
+                    if self?.currentExpression == expr { self?.currentExpression = .normal }
+                }
+            }
+            return
+        }
+        
+        // 摇晃检测（连续尖峰，阈值较高）
+        if delta > exprConfig.shake.threshold {
+            if now.timeIntervalSince(lastSpikeTime) > exprConfig.knock.recoverSeconds { spikeCount = 0 }
+            spikeCount += 1
+            lastSpikeTime = now
+            
+            if spikeCount >= exprConfig.shake.spikeCount {
+                if !isDizzy {
+                    isDizzy = true
+                    if let expr = ExpressionType(rawValue: exprConfig.shake.e) {
+                        currentExpression = expr
+                        debugInfo.expression = expr.displayName
+                        debugInfo.workflow = "摇晃"
+                    }
+                    playSound(exprConfig.shake.s)
+                    spikeCount = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + exprConfig.shake.dizzySeconds) { [weak self] in
+                        self?.isDizzy = false
+                        self?.currentExpression = .normal
                     }
                 }
             }

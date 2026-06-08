@@ -187,12 +187,21 @@
   "listeningExpressions": ["listening", "focused", "listening", "thinking"],
   "thinkingExpressions": ["thinking", "focused", "confused", "suspicious"],
   "negativeEmotions": ["sad", "angry", "scared", "bored", "sleepy", "confused"],
-  "shakeThreshold": 1.2,
-  "shakeSpikeCount": 2,
-  "shakeDizzySeconds": 3,
-  "knockRecoverSeconds": 0.6,
-  "shakeConfig": { "e": "confused", "s": "dizzy" },
-  "knockConfig": { "e": "surprised", "s": "happy", "lx": 0, "ly": -0.4 },
+  "shake": {
+    "threshold": 1.2,
+    "spikeCount": 2,
+    "dizzySeconds": 3,
+    "e": "confused",
+    "s": "dizzy"
+  },
+  "knock": {
+    "threshold": 0.5,
+    "recoverSeconds": 0.6,
+    "e": "surprised",
+    "s": "happy",
+    "lx": 0,
+    "ly": -0.4
+  },
   "speakingDurationSec": 5.0,
   "speakingCycleIntervalSec": 3.0,
   "commandDurationSec": 3.0,
@@ -208,9 +217,7 @@
     "lightDark":     { "e": "sleepy",    "s": null,        "t": 4.0, "luxBelow": 10 },
     "altitudeUp":    { "e": "surprised", "s": "surprised", "t": 3.0, "altChange": 3.0 },
     "altitudeDown":  { "e": "scared",    "s": "surprised", "t": 3.0, "altChange": -3.0 },
-    "walking":       { "e": "happy",     "s": null,        "t": 3.0, "stepsPerMin": 60 },
     "faceClose":     { "e": "shy",       "s": "happy",     "t": 2.0, "proximity": true },
-    "hotTemp":       { "e": "angry",     "s": "angry",     "t": 4.0, "tempAbove": 35 },
     "pickedUp":     { "e": "surprised", "s": "surprised", "t": 3.0, "accelBelow": 0.6, "proximity": false, "roll": 10 }
   },
   "camera": {
