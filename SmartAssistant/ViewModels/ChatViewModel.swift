@@ -366,9 +366,8 @@ class ChatViewModel: ObservableObject {
         }
         
         // 普通对话
-        let sensorContext = collectSensorContext()
         do {
-            let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
+            let (response, tokens) = try await aiService.sendMessage(trimmed)
             isProcessing = false
             debugInfo.tokens = tokens
             debugInfo.totalTokens += tokens
@@ -388,6 +387,13 @@ class ChatViewModel: ObservableObject {
             if !isPlayingSequence { playSequence("error") }
             playSound("error")
             messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            // 错误后自动恢复
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+                self?.conversationState = .idle
+                self?.currentExpression = .normal
+                self?.lookX = 0; self?.lookY = 0
+                if self?.config.autoListen == true { self?.startListening() }
+            }
         }
     }
     
@@ -420,9 +426,8 @@ class ChatViewModel: ObservableObject {
             return
         }
         
-        let sensorContext = collectSensorContext()
         do {
-            let (response, tokens) = try await aiService.sendMessage(trimmed, sensorContext: sensorContext)
+            let (response, tokens) = try await aiService.sendMessage(trimmed)
             isProcessing = false
             debugInfo.tokens = tokens
             debugInfo.totalTokens += tokens
@@ -442,6 +447,13 @@ class ChatViewModel: ObservableObject {
             if !isPlayingSequence { playSequence("error") }
             playSound("error")
             messages.append(ChatMessage(role: .assistant, content: "error", expression: .sad))
+            // 错误后自动恢复
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+                self?.conversationState = .idle
+                self?.currentExpression = .normal
+                self?.lookX = 0; self?.lookY = 0
+                if self?.config.autoListen == true { self?.startListening() }
+            }
         }
     }
     

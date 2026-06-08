@@ -376,6 +376,7 @@ function simSensor(s){
   const btn=document.getElementById('sensor-'+s.id);
   btn.classList.add('active');
   activeSensor=s.id;
+  stopIdleCycle();
   
   setMood(s.expr);
   if(s.seq) playSensorSequence(s.seq);
@@ -386,6 +387,7 @@ function simSensor(s){
     btn.classList.remove('active');
     activeSensor=null;
     setMood('normal');
+    startIdleCycle();
     log(`[传感器] ${s.label}: 恢复`,'info');
   },s.sec*1000);
 }
@@ -632,7 +634,28 @@ function addMsg(role, text, emotion){
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ===== AI 聊天 =====
+// ===== 空闲表情循环（模拟 iOS idle 行为）=====
+let idleExpressions=['normal','cool','happy','thinking','wink','focused','normal','shy','listening','normal'];
+let idleIndex=0, idleTimer=null, idleActive=true;
+
+function startIdleCycle(){
+  idleActive=true;
+  const cycle=jsonLoaded&&exprCfg.idleExpressions.length?exprCfg.idleExpressions:idleExpressions;
+  idleIndex=0;
+  if(idleTimer) clearInterval(idleTimer);
+  idleTimer=setInterval(()=>{
+    if(!idleActive||activeSensor) return;
+    const expr=cycle[idleIndex%cycle.length];
+    setMood(expr);
+    // 随机视线扫视
+    const lx=(Math.random()-0.5)*0.3;
+    const ly=(Math.random()-0.5)*0.2;
+    setLook(lx,ly);
+    idleIndex++;
+  },3000);
+}
+
+function stopIdleCycle(){ idleActive=false; }
 
 async function fetchBalance(){
   const cfg=getConfig();
@@ -668,11 +691,13 @@ async function send(){
   addMsg('user', text);
   log(`用户: ${text}`);
   addMsg('ai', '思考中...');
+  stopIdleCycle();
   
   // 指令检测
   const cmd=detectCommand(text);
   if(cmd){
     setMood(cmd.expr);
+    startIdleCycle();
     log(`指令匹配: ${cmd.cmd} → ${cmd.expr}`);
     document.querySelector('#chatBox .msg.ai:last-child .bubble').textContent=`[指令: ${cmd.cmd}]`;
     document.querySelector('#chatBox .msg.ai:last-child .tag').textContent=EMOJI[cmd.expr]+' '+DISPLAY[cmd.expr];
@@ -751,8 +776,10 @@ async function send(){
     
     history.push({role:'user',content:text},{role:'assistant',content:aiText});
     if(history.length>20) history=history.slice(-20);
+    startIdleCycle();
     
   }catch(e){
+    startIdleCycle();
     const last=document.querySelector('#chatBox .msg.ai:last-child');
     last.querySelector('.bubble').textContent='错误: '+e.message;
     last.querySelector('.bubble').style.color='var(--danger)';
@@ -783,6 +810,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const proxyOn=localStorage.getItem('debug_useProxy')==='1';
   document.getElementById('useProxy').checked=proxyOn;
   buildSensorBar();
+  startIdleCycle();
   log('就绪 - 填写 API Key 后即可调试','info');
   log('CORS报错请启动代理: python proxy.py 并勾选"代理"','info');
 });

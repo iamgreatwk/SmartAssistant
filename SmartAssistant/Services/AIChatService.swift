@@ -39,30 +39,28 @@ class AIChatService: ObservableObject {
         await MainActor.run { isProcessing = true }
         defer { Task { @MainActor in isProcessing = false } }
         
-        // 添加用户消息
+        // 添加用户消息到历史
         let userMessage = ChatRequest.ChatRequestMessage(role: "user", content: text)
         conversationHistory.append(userMessage)
         
-        // 如果有传感器上下文，追加
-        if let context = sensorContext, !context.isEmpty {
-            let sensorMessage = ChatRequest.ChatRequestMessage(
-                role: "system",
-                content: "[传感器数据] \(context)"
-            )
-            conversationHistory.append(sensorMessage)
-        }
-        
-        // 裁剪历史记录
+        // 裁剪历史（保留 system prompt + 最近 N 条）
         if conversationHistory.count > maxHistoryCount + 1 {
-            // 保留 system prompt + 最近 N 条
             let systemPrompt = conversationHistory.first!
             let recent = conversationHistory.suffix(maxHistoryCount)
             conversationHistory = [systemPrompt] + recent
         }
         
-        // 构建请求
+        // 构建请求消息：历史 + 传感器上下文（一次性，不入历史）
+        var requestMessages = conversationHistory
+        if let context = sensorContext, !context.isEmpty {
+            requestMessages.append(ChatRequest.ChatRequestMessage(
+                role: "system",
+                content: "[传感器数据] \(context)"
+            ))
+        }
+        
         let request = ChatRequest(
-            messages: conversationHistory,
+            messages: requestMessages,
             sensorContext: sensorContext,
             model: config.aiModel
         )
